@@ -1,0 +1,24 @@
+{
+  "name": "@pause/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@pause/db": "workspace:*",
+    "@pause/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@pause/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

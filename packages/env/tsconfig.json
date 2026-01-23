@@ -1,0 +1,6 @@
+{
+  "extends": "@pause/config/tsconfig.base.json",
+  "compilerOptions": {
+    "strictNullChecks": true
+  }
+}

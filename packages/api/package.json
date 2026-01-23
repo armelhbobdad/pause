@@ -1,0 +1,27 @@
+{
+  "name": "@pause/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@pause/auth": "workspace:*",
+    "@pause/db": "workspace:*",
+    "@pause/env": "workspace:*",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "dotenv": "catalog:",
+    "next": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@pause/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
