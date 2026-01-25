@@ -2,8 +2,6 @@ import { auth } from "@pause/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { authClient } from "@/lib/auth-client";
-
 import Dashboard from "./dashboard";
 
 export default async function DashboardPage() {
