@@ -1,4 +1,5 @@
 import { db } from "@pause/db";
+// biome-ignore lint/performance/noNamespaceImport: Drizzle adapter requires the full schema object
 import * as schema from "@pause/db/schema/auth";
 import { env } from "@pause/env/server";
 import { betterAuth } from "better-auth";

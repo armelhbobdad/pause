@@ -19,6 +19,7 @@ export default function AIPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll must trigger when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -26,7 +27,9 @@ export default function AIPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text) return;
+    if (!text) {
+      return;
+    }
     sendMessage({ text });
     setInput("");
   };
@@ -51,14 +54,14 @@ export default function AIPage() {
               <p className="mb-1 font-semibold text-sm">
                 {message.role === "user" ? "You" : "AI Assistant"}
               </p>
-              {message.parts?.map((part, index) => {
+              {message.parts?.map((part, partIndex) => {
                 if (part.type === "text") {
                   return (
                     <Streamdown
                       isAnimating={
                         status === "streaming" && message.role === "assistant"
                       }
-                      key={index}
+                      key={`${message.id}-${partIndex}`}
                     >
                       {part.text}
                     </Streamdown>
