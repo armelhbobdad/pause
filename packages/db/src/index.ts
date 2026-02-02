@@ -3,6 +3,7 @@ import { env } from "@pause/env/server";
 import { drizzle } from "drizzle-orm/neon-http";
 import ws from "ws";
 
+// biome-ignore lint/performance/noNamespaceImport: Drizzle ORM requires the full schema object
 import * as schema from "./schema";
 
 neonConfig.webSocketConstructor = ws;
