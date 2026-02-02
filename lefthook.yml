@@ -1,0 +1,67 @@
+pre-commit:
+  parallel: true
+  jobs:
+    # Formatting and linting
+    - name: ultracite
+      env:
+        PATH: "{root}/node_modules/.bin:$HOME/.bun/bin:$PATH"
+      run: bun x ultracite fix
+      glob:
+        - "**/*.js"
+        - "**/*.jsx"
+        - "**/*.ts"
+        - "**/*.tsx"
+        - "**/*.json"
+        - "**/*.jsonc"
+        - "**/*.css"
+      stage_fixed: true
+
+    # TypeScript type checking across all workspaces (glob triggers the check)
+    - name: typescript
+      env:
+        PATH: "{root}/node_modules/.bin:$HOME/.bun/bin:$PATH"
+      glob:
+        - "**/*.ts"
+        - "**/*.tsx"
+      run: bun run --silent check-types
+
+    # Detect hardcoded secrets (API keys, tokens, passwords)
+    - name: gitleaks
+      env:
+        PATH: "$HOME/.local/bin:$PATH"
+      run: gitleaks git --pre-commit --staged --no-banner
+
+    # Spell checking
+    - name: typos
+      env:
+        PATH: "$HOME/.local/bin:$PATH"
+      run: typos {staged_files}
+      glob:
+        - "**/*.ts"
+        - "**/*.tsx"
+        - "**/*.js"
+        - "**/*.jsx"
+        - "**/*.md"
+        - "**/*.json"
+        - "**/*.yml"
+        - "**/*.yaml"
+        - "**/*.toml"
+      stage_fixed: true
+
+# Validate commit messages follow conventional commits
+commit-msg:
+  jobs:
+    - name: commitlint
+      env:
+        PATH: "{root}/node_modules/.bin:$HOME/.bun/bin:$PATH"
+      run: bun x commitlint --edit {1}
+
+# Heavier checks before pushing
+pre-push:
+  parallel: true
+  jobs:
+    # Dead code, unused dependencies and exports
+    - name: knip
+      env:
+        PATH: "{root}/node_modules/.bin:$HOME/.bun/bin:$PATH"
+      run: bun x knip --no-exit-code

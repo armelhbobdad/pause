@@ -1,0 +1,15 @@
+[files]
+extend-exclude = [
+  "bun.lock",
+  "*.lock",
+  "node_modules",
+  ".next",
+  ".firecrawl",
+  "*.svg",
+  "*.png",
+  "*.jpg",
+  "*.ico",
+]
+
+[default.extend-words]
+# Add false-positive corrections here as needed
