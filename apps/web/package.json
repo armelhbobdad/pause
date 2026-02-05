@@ -6,7 +6,10 @@
     "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "dev:db": "docker compose up -d db",
+    "dev:db:stop": "docker compose down",
+    "dev:db:logs": "docker compose logs -f db"
   },
   "dependencies": {
     "@ai-sdk/devtools": "^0.0.2",

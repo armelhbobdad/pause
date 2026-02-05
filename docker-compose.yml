@@ -1,0 +1,36 @@
+# Neon Local Development Setup
+# See: docs/local-development.md for usage instructions
+#
+# This configuration connects to the Neon dev branch via the official
+# neondatabase/neon_local proxy. The proxy provides a static localhost
+# connection string while routing queries to the cloud database.
+#
+# Required environment variables (set in .env.local):
+#   NEON_API_KEY: Your Neon API key (create at console.neon.tech)
+#
+# Quick start:
+#   1. Create .env.local with NEON_API_KEY
+#   2. Run: bun run dev:db
+#   3. Connect via: postgres://neon:npg@localhost:5432/neondb
+
+services:
+  db:
+    image: neondatabase/neon_local:latest
+    container_name: pause-neon-local
+    ports:
+      - '5432:5432'
+    env_file:
+      - apps/web/.env.local
+    environment:
+      # Neon API key is loaded from env_file (apps/web/.env.local)
+      # Pause project ID (from Story 0-1)
+      NEON_PROJECT_ID: odd-hat-30261885
+      # Dev branch ID (from Story 0-2)
+      BRANCH_ID: br-wandering-fire-aiv9f4rw
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-h', 'localhost', '-p', '5432', '-U', 'neon']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
