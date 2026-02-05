@@ -25,13 +25,26 @@ const EXPANSION_AUTO_TRANSITION_MS = 50;
 
 /**
  * Guardian UI State Machine
- * Per Architecture ADR line 445-446:
+ * Per Architecture ADR line 445-446, extended for Story 2.3 reveal:
  * - idle: Resting state, card locked
  * - expanding: User tapped card, animation starting
  * - active: Guardian is processing (streaming and awaiting feedback)
  * - collapsing: User clicked Accept/Override, animation ending
+ * - revealed: Card is unlocked, details visible (added in Story 2.3)
  */
-export type GuardianState = "idle" | "expanding" | "active" | "collapsing";
+export type GuardianState =
+  | "idle"
+  | "expanding"
+  | "active"
+  | "collapsing"
+  | "revealed";
+
+/**
+ * Type of reveal animation - determines CSS animation timing
+ * - earned: Guardian approved unlock (500-700ms ease-out-expo, warm snap)
+ * - override: User bypassed Guardian (300-400ms linear, mechanical)
+ */
+export type RevealType = "earned" | "override";
 
 /**
  * Actions that trigger state transitions
@@ -41,7 +54,10 @@ export type GuardianAction =
   | { type: "EXPANSION_COMPLETE" }
   | { type: "RESPONSE_RECEIVED" }
   | { type: "COLLAPSE_COMPLETE" }
-  | { type: "TIMEOUT" };
+  | { type: "TIMEOUT" }
+  | { type: "REVEAL_APPROVED" } // Guardian approved unlock (Story 2.3)
+  | { type: "REVEAL_OVERRIDE" } // User bypassed Guardian (Story 2.3)
+  | { type: "RELOCK" }; // Countdown expired or manual relock (Story 2.3)
 
 export interface UseGuardianStateOptions {
   /** Timeout in milliseconds before triggering timeout action (default: 10000ms per FR11) */
@@ -57,6 +73,10 @@ export interface UseGuardianStateReturn {
   isActive: boolean;
   /** Whether Guardian is idle and ready for unlock request */
   isIdle: boolean;
+  /** Whether card details are revealed */
+  isRevealed: boolean;
+  /** Type of reveal animation ("earned" or "override"), null if not revealed */
+  revealType: RevealType | null;
   /** Request an unlock - transitions from idle to expanding */
   requestUnlock: () => void;
   /** Signal that expansion animation completed - transitions from expanding to active */
@@ -65,6 +85,12 @@ export interface UseGuardianStateReturn {
   onResponseReceived: () => void;
   /** Signal that collapse animation completed - transitions from collapsing to idle */
   onCollapseComplete: () => void;
+  /** Signal that Guardian approved unlock - transitions to revealed (Story 2.3) */
+  revealApproved: () => void;
+  /** Signal that user overrode Guardian - transitions to revealed with faster animation (Story 2.3) */
+  revealOverride: () => void;
+  /** Signal that countdown expired or manual relock - transitions from revealed to idle (Story 2.3) */
+  relock: () => void;
   /** Dispatch any action directly (for advanced use cases) */
   dispatch: React.Dispatch<GuardianAction>;
 }
@@ -74,39 +100,61 @@ export interface UseGuardianStateReturn {
 // ============================================================================
 
 /**
+ * Internal state shape with reveal type tracking
+ */
+interface GuardianInternalState {
+  status: GuardianState;
+  revealType: RevealType | null;
+}
+
+/**
  * Guardian state machine reducer following Architecture guidelines.
  * Transitions:
  * - idle → expanding (user taps card via REQUEST_UNLOCK)
  * - expanding → active (animation completes via EXPANSION_COMPLETE or auto-transition)
  * - active → collapsing (response received or timeout via RESPONSE_RECEIVED/TIMEOUT)
+ * - active → revealed (Guardian approved via REVEAL_APPROVED)
+ * - active → revealed (User override via REVEAL_OVERRIDE)
  * - collapsing → idle (animation completes via COLLAPSE_COMPLETE)
+ * - revealed → idle (countdown expired or manual relock via RELOCK)
  */
 function guardianReducer(
-  state: GuardianState,
+  state: GuardianInternalState,
   action: GuardianAction
-): GuardianState {
-  switch (state) {
+): GuardianInternalState {
+  switch (state.status) {
     case "idle":
       if (action.type === "REQUEST_UNLOCK") {
-        return "expanding";
+        return { status: "expanding", revealType: null };
       }
       return state;
     case "expanding":
       if (action.type === "EXPANSION_COMPLETE") {
-        return "active";
+        return { status: "active", revealType: null };
       }
       return state;
     case "active":
       if (action.type === "RESPONSE_RECEIVED") {
-        return "collapsing";
+        return { status: "collapsing", revealType: null };
       }
       if (action.type === "TIMEOUT") {
-        return "collapsing";
+        return { status: "collapsing", revealType: null };
+      }
+      if (action.type === "REVEAL_APPROVED") {
+        return { status: "revealed", revealType: "earned" };
+      }
+      if (action.type === "REVEAL_OVERRIDE") {
+        return { status: "revealed", revealType: "override" };
       }
       return state;
     case "collapsing":
       if (action.type === "COLLAPSE_COMPLETE") {
-        return "idle";
+        return { status: "idle", revealType: null };
+      }
+      return state;
+    case "revealed":
+      if (action.type === "RELOCK") {
+        return { status: "idle", revealType: null };
       }
       return state;
     default:
@@ -137,11 +185,16 @@ function guardianReducer(
  * <CardVault isActive={isActive} onUnlockRequest={requestUnlock} />
  * ```
  */
+const INITIAL_STATE: GuardianInternalState = {
+  status: "idle",
+  revealType: null,
+};
+
 export function useGuardianState(
   options: UseGuardianStateOptions = {}
 ): UseGuardianStateReturn {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, onTimeout } = options;
-  const [state, dispatch] = useReducer(guardianReducer, "idle");
+  const [internalState, dispatch] = useReducer(guardianReducer, INITIAL_STATE);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const expansionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -152,9 +205,14 @@ export function useGuardianState(
   const onTimeoutRef = useRef(onTimeout);
   onTimeoutRef.current = onTimeout;
 
+  // Extract status for easier access
+  const state = internalState.status;
+
   // Computed state helpers
   const isActive = state === "expanding" || state === "active";
   const isIdle = state === "idle";
+  const isRevealed = state === "revealed";
+  const revealType = internalState.revealType;
 
   // Auto-transition from expanding → active after brief delay
   // This ensures the pulse animation starts. In Story 2.5, this will be
@@ -220,14 +278,51 @@ export function useGuardianState(
     dispatch({ type: "COLLAPSE_COMPLETE" });
   }
 
+  function revealApproved() {
+    // Only process if in active state
+    if (state !== "active") {
+      return;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    dispatch({ type: "REVEAL_APPROVED" });
+  }
+
+  function revealOverride() {
+    // Only process if in active state
+    if (state !== "active") {
+      return;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    dispatch({ type: "REVEAL_OVERRIDE" });
+  }
+
+  function relock() {
+    // Only process if in revealed state
+    if (state !== "revealed") {
+      return;
+    }
+    dispatch({ type: "RELOCK" });
+  }
+
   return {
     state,
     isActive,
     isIdle,
+    isRevealed,
+    revealType,
     requestUnlock,
     onExpansionComplete,
     onResponseReceived,
     onCollapseComplete,
+    revealApproved,
+    revealOverride,
+    relock,
     dispatch,
   };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { KeyboardEvent } from "react";
+import { CountdownTimer } from "@/components/guardian/countdown-timer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -25,12 +26,25 @@ export interface CardData {
   updatedAt: Date;
 }
 
+/** Type of reveal animation to use */
+export type RevealType = "earned" | "override" | null;
+
 export interface CardVaultProps {
   card: CardData | null;
   onUnlockRequest?: () => void;
   className?: string;
   /** When true, Guardian is processing the unlock request - shows pulse animation */
   isActive?: boolean;
+  /** When true, card details are revealed (frost overlay fades out) */
+  isRevealed?: boolean;
+  /** Type of reveal determines animation timing: "earned" (warm snap) or "override" (mechanical) */
+  revealType?: RevealType;
+  /** When true, shows countdown timer at card bottom after reveal */
+  showCountdown?: boolean;
+  /** Countdown duration in milliseconds (default: 60000ms per executive function window) */
+  countdownDuration?: number;
+  /** Callback when countdown timer expires */
+  onCountdownExpire?: () => void;
 }
 
 // ============================================================================
@@ -123,6 +137,11 @@ export function CardVault({
   onUnlockRequest,
   className,
   isActive = false,
+  isRevealed = false,
+  revealType = null,
+  showCountdown = false,
+  countdownDuration = 60_000,
+  onCountdownExpire,
 }: CardVaultProps) {
   // Track duplicate tap attempts for subtle feedback (AC#4)
   // Counter changes the announcement text, triggering aria-live to re-announce
@@ -159,20 +178,33 @@ export function CardVault({
   }
 
   // Dynamic aria-label based on state
-  const ariaLabel = isActive
-    ? "Guardian analyzing your request. Processing..."
-    : "Payment card locked. Tap to request unlock.";
+  function getAriaLabel() {
+    if (isRevealed) {
+      return "Payment card unlocked. Card details visible.";
+    }
+    if (isActive) {
+      return "Guardian analyzing your request. Processing...";
+    }
+    return "Payment card locked. Tap to request unlock.";
+  }
+  const ariaLabel = getAriaLabel();
 
-  // Screen reader announcement text based on state (UX-94)
-  // Note: "Guardian analysis complete" announcement deferred to Story 2.3
-  const liveAnnouncement = isActive
-    ? "Guardian is analyzing your unlock request"
-    : "";
+  // Screen reader announcement text based on state (UX-94, AC#2)
+  function getLiveAnnouncement() {
+    if (isRevealed) {
+      return "Card unlocked. Details now visible.";
+    }
+    if (isActive) {
+      return "Guardian is analyzing your unlock request";
+    }
+    return "";
+  }
+  const liveAnnouncement = getLiveAnnouncement();
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: Card vault requires fixed aspect ratio (1.586) and visual card appearance that buttons don't support. Uses aria-busy for processing state indication.
     <div
-      aria-busy={isActive}
+      aria-busy={isActive && !isRevealed}
       aria-label={ariaLabel}
       className={cn(
         "relative mx-auto w-full max-w-[28rem] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
@@ -219,17 +251,39 @@ export function CardVault({
           </div>
         </div>
 
-        {/* Frost overlay (animatable for reveal in Story 2.3)
-            This layer applies backdrop-filter blur over the card content.
-            Set as a separate element to allow future opacity transitions. */}
+        {/* Frost overlay with opacity transition for reveal animation.
+            Per UX-42: Animation targets opacity not blur amount for 60fps guarantee.
+            backdrop-filter blur remains constant; opacity fades the overlay out.
+            data-revealed attribute set for external CSS targeting/testing (state managed via inline styles). */}
         <div
           className="pointer-events-none absolute inset-0"
           data-frost-overlay
-          style={{
-            backdropFilter: "blur(var(--frost-blur))",
-            WebkitBackdropFilter: "blur(var(--frost-blur))",
-          }}
+          data-revealed={isRevealed || undefined}
+          style={
+            {
+              backdropFilter: "blur(var(--frost-blur))",
+              WebkitBackdropFilter: "blur(var(--frost-blur))",
+              opacity: "var(--frost-opacity)",
+              // Apply transition based on reveal type
+              // earned = 600ms ease-out-expo (warm snap), override = 350ms linear (mechanical)
+              transition:
+                revealType === "override"
+                  ? "--frost-opacity var(--duration-reveal-override) linear"
+                  : "--frost-opacity var(--duration-reveal) var(--ease-out-expo)",
+              // Set frost-opacity based on revealed state
+              "--frost-opacity": isRevealed ? 0 : 1,
+            } as React.CSSProperties
+          }
         />
+
+        {/* Countdown timer appears at card bottom after reveal (UX-76)
+            Shows executive function window before auto-relock. */}
+        {isRevealed && showCountdown && (
+          <CountdownTimer
+            durationMs={countdownDuration}
+            onExpire={onCountdownExpire}
+          />
+        )}
       </div>
     </div>
   );
