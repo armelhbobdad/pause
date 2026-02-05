@@ -8,6 +8,13 @@
       "when": 1770303795988,
       "tag": "0000_zippy_nuke",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770310314775,
+      "tag": "0001_pale_stark_industries",
+      "breakpoints": true
     }
   ]
 }
