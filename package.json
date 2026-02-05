@@ -31,6 +31,8 @@
     "db:studio": "turbo -F @pause/db db:studio",
     "db:generate": "turbo -F @pause/db db:generate",
     "db:migrate": "turbo -F @pause/db db:migrate",
+    "db:seed:rookie": "bun run scripts/seed-rookie.ts",
+    "db:seed:pro": "bun run scripts/seed-pro.ts",
     "check": "ultracite check",
     "fix": "ultracite fix",
     "knip": "knip",

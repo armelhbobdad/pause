@@ -1,0 +1,56 @@
+/**
+ * Guardian Design Tokens
+ *
+ * These design tokens define the visual language for the Guardian UI system.
+ * All colors use oklch for perceptual uniformity across displays.
+ *
+ * @constraint UX-45: 13 custom properties (clarified from AC#1's "11" - actual spec lists 13)
+ *
+ * Token Categories:
+ * - Guardian Pulse: Animation colors for the "analyzing" state
+ * - Frost: Blur effect for card vault
+ * - Negotiator: Savings/gold tier colors
+ * - Therapist: Amber tier colors (gentle reflection)
+ * - Card Vault: Base colors for frosted glass effect
+ * - Transitions: Duration tokens (easing applied at component level)
+ * - Typography: Font stack definitions
+ */
+
+:root {
+  /* Guardian Pulse Animation (Analyst tier - cool neutral)
+     ADR-TOKEN-002: High lightness (L>=0.85) ensures pulse is visible against dark card background */
+  --guardian-pulse-start: oklch(0.85 0.02 250);
+  --guardian-pulse-end: oklch(0.92 0.01 250);
+
+  /* Frost Blur
+     ADR: 12px allows card's last 4 digits to remain visible as a teaser */
+  --frost-blur: 12px;
+
+  /* Negotiator Tier (warm gold - "found money" feeling)
+     ADR-TOKEN-001: H=85 is true gold hue; C=0.18 is saturated enough to feel exciting */
+  --savings-gold: oklch(0.75 0.18 85);
+  --savings-gold-subtle: oklch(0.92 0.08 85);
+
+  /* Therapist Tier (soft amber - gentle reflection)
+     ADR: H=50 (not 55) avoids orange warning feel; lower chroma for softness */
+  --therapist-amber: oklch(0.72 0.14 50);
+  --therapist-amber-subtle: oklch(0.9 0.06 50);
+
+  /* Card Vault (dark frosted glass base)
+     ADR-TOKEN-002: L=0.2 provides contrast for pulse animation (L>=0.7 pulse vs L<=0.3 card) */
+  --card-bg: oklch(0.2 0.02 250);
+  --card-border: oklch(0.4 0.02 250);
+
+  /* Transition Timing (duration only - easing applied at component level)
+     ADR-TOKEN-003: 500ms reveal is "intentional action" range; 200ms expand keeps streaming snappy */
+  --transition-reveal: 500ms;
+  --transition-expand: 200ms;
+
+  /* Typography
+     ADR: Geist Sans is Next.js default; JetBrains Mono for data/codes
+     Note: Uses CSS variables from next/font/google loaded in layout.tsx */
+  --font-conversation:
+    var(--font-geist-sans), "Geist Sans", system-ui, sans-serif;
+  --font-data:
+    var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+}
