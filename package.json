@@ -33,6 +33,7 @@
     "db:migrate": "turbo -F @pause/db db:migrate",
     "db:seed:rookie": "bun run scripts/seed-rookie.ts",
     "db:seed:pro": "bun run scripts/seed-pro.ts",
+    "test:smoke-trace": "bun run scripts/test-smoke-trace.ts",
     "check": "ultracite check",
     "fix": "ultracite fix",
     "knip": "knip",
@@ -41,6 +42,7 @@
   "dependencies": {
     "@pause/env": "workspace:*",
     "dotenv": "catalog:",
+    "opik": "^1.10.6",
     "zod": "catalog:"
   },
   "devDependencies": {
