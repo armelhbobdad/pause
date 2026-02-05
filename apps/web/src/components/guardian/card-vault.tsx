@@ -29,6 +29,8 @@ export interface CardVaultProps {
   card: CardData | null;
   onUnlockRequest?: () => void;
   className?: string;
+  /** When true, Guardian is processing the unlock request - shows pulse animation */
+  isActive?: boolean;
 }
 
 // ============================================================================
@@ -120,11 +122,33 @@ export function CardVault({
   card,
   onUnlockRequest,
   className,
+  isActive = false,
 }: CardVaultProps) {
+  // Track duplicate tap attempts for subtle feedback (AC#4)
+  // Counter changes the announcement text, triggering aria-live to re-announce
+  const duplicateTapCountRef = { current: 0 };
+
+  // Handle click - prevent duplicate requests when already active
+  function handleClick() {
+    if (isActive) {
+      // Already processing - increment counter for subtle feedback
+      duplicateTapCountRef.current += 1;
+      return;
+    }
+    duplicateTapCountRef.current = 0;
+    onUnlockRequest?.();
+  }
+
   // Handle keyboard events for accessibility (Enter/Space trigger unlock request)
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
+      if (isActive) {
+        // Already processing - increment counter for subtle feedback
+        duplicateTapCountRef.current += 1;
+        return;
+      }
+      duplicateTapCountRef.current = 0;
       onUnlockRequest?.();
     }
   }
@@ -134,21 +158,38 @@ export function CardVault({
     return <CardVaultEmpty className={className} />;
   }
 
+  // Dynamic aria-label based on state
+  const ariaLabel = isActive
+    ? "Guardian analyzing your request. Processing..."
+    : "Payment card locked. Tap to request unlock.";
+
+  // Screen reader announcement text based on state (UX-94)
+  // Note: "Guardian analysis complete" announcement deferred to Story 2.3
+  const liveAnnouncement = isActive
+    ? "Guardian is analyzing your unlock request"
+    : "";
+
   return (
-    // biome-ignore lint/a11y/useSemanticElements: Card vault requires fixed aspect ratio (1.586) and visual card appearance that buttons don't support. Uses aria-disabled="true" per UX-93 for focusable-but-disabled semantic state.
+    // biome-ignore lint/a11y/useSemanticElements: Card vault requires fixed aspect ratio (1.586) and visual card appearance that buttons don't support. Uses aria-busy for processing state indication.
     <div
-      aria-disabled="true"
-      aria-label="Payment card locked. Tap to request unlock."
+      aria-busy={isActive}
+      aria-label={ariaLabel}
       className={cn(
         "relative mx-auto w-full max-w-[28rem] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        isActive && "animate-guardian-pulse",
         className
       )}
-      onClick={() => onUnlockRequest?.()}
+      onClick={handleClick}
       onKeyDown={handleKeyDown}
       role="button"
       style={{ aspectRatio: "1.586" }}
       tabIndex={0}
     >
+      {/* Screen reader live region for status announcements (UX-94) */}
+      <div aria-atomic="true" aria-live="polite" className="sr-only">
+        {liveAnnouncement}
+      </div>
+
       {/* Card surface */}
       <div
         className="absolute inset-0 overflow-hidden rounded-2xl"

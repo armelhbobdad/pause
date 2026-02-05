@@ -46,6 +46,10 @@
   --transition-reveal: 500ms;
   --transition-expand: 200ms;
 
+  /* Guardian Pulse Animation Duration
+     ADR: 2s cycle for subtle, non-distracting pulsing effect during active state */
+  --pulse-duration: 2s;
+
   /* Typography
      ADR: Geist Sans is Next.js default; JetBrains Mono for data/codes
      Note: Uses CSS variables from next/font/google loaded in layout.tsx */

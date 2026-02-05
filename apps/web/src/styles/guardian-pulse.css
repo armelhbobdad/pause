@@ -1,0 +1,37 @@
+/**
+ * Guardian Pulse Animation
+ *
+ * Radial gradient pulse animation that expands outward from the card border.
+ * Used during the "analyzing" state to provide visual feedback while the Guardian
+ * processes the unlock request.
+ *
+ * @design-token --guardian-pulse-start: oklch(0.85 0.02 250) - high lightness for visibility
+ * @design-token --guardian-pulse-end: oklch(0.92 0.01 250) - slightly lighter end state
+ * @constraint UX-02: Pulse must be a radial gradient animation expanding outward
+ * @constraint NFR-P3: Animation must run at 60fps
+ */
+
+@keyframes guardian-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--guardian-pulse-start);
+  }
+  50% {
+    box-shadow: 0 0 0 8px var(--guardian-pulse-end);
+  }
+  100% {
+    box-shadow: 0 0 0 0 var(--guardian-pulse-start);
+  }
+}
+
+/**
+ * Animation class for the Guardian Pulse effect.
+ * Applied to the Card Vault component when isActive === true.
+ *
+ * - 2s duration for subtle, non-distracting pulsing effect
+ * - ease-in-out for smooth acceleration/deceleration
+ * - infinite loop while in active state
+ * - GPU-composited via box-shadow (no layout thrashing)
+ */
+.animate-guardian-pulse {
+  animation: guardian-pulse var(--pulse-duration, 2s) ease-in-out infinite;
+}
