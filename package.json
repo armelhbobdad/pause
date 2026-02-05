@@ -33,7 +33,7 @@
     "check": "ultracite check",
     "fix": "ultracite fix",
     "knip": "knip",
-    "prepare": "lefthook install"
+    "prepare": "[ -n \"$CI\" ] || lefthook install"
   },
   "dependencies": {
     "@pause/env": "workspace:*",
