@@ -22,6 +22,22 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "production", "test"])
       .default("development"),
+    // Opik observability: traces Guardian interactions
+    // Required in production, optional in development
+    OPIK_API_KEY: z
+      .string()
+      .min(1)
+      .optional()
+      .refine(
+        (val) => process.env.NODE_ENV !== "production" || val !== undefined,
+        { message: "OPIK_API_KEY is required in production" }
+      ),
+    OPIK_PROJECT_NAME: z.string().min(1).default("pause"),
+    OPIK_WORKSPACE: z.string().min(1).optional(),
+    // Google Generative AI: required for Gemini model
+    GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1),
+    // Demo mode: controls trace tagging and feature flags
+    DEMO_MODE: z.enum(["true", "false"]).default("false"),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
