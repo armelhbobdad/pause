@@ -26,8 +26,10 @@
   },
   "devDependencies": {
     "@pause/config": "workspace:*",
+    "@types/pg": "^8.16.0",
     "@types/ws": "^8.18.1",
     "drizzle-kit": "^0.31.8",
+    "pg": "^8.18.0",
     "typescript": "catalog:"
   }
 }
