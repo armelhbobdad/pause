@@ -18,7 +18,11 @@
         "CORS_ORIGIN",
         "VERCEL_URL",
         "VERCEL_ENV",
-        "NODE_ENV"
+        "NODE_ENV",
+        "OPIK_API_KEY",
+        "OPIK_PROJECT_NAME",
+        "OPIK_WORKSPACE",
+        "DEMO_MODE"
       ]
     },
     "lint": {
