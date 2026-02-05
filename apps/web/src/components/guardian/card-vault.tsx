@@ -189,9 +189,13 @@ export function CardVault({
   }
   const ariaLabel = getAriaLabel();
 
-  // Screen reader announcement text based on state (UX-94, AC#2)
+  // Screen reader announcement text based on state (UX-94, AC#2, Story 2-4 AC#3)
   function getLiveAnnouncement() {
     if (isRevealed) {
+      // Differentiate override vs earned reveal announcements per Story 2-4 AC#3
+      if (revealType === "override") {
+        return "Card unlocked. You chose to skip the Guardian's suggestion.";
+      }
       return "Card unlocked. Details now visible.";
     }
     if (isActive) {
