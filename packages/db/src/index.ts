@@ -6,10 +6,23 @@ import ws from "ws";
 // biome-ignore lint/performance/noNamespaceImport: Drizzle ORM requires the full schema object
 import * as schema from "./schema";
 
+// Configure for Node.js WebSocket support
 neonConfig.webSocketConstructor = ws;
 
-// To work in edge environments (Cloudflare Workers, Vercel Edge, etc.), enable querying over fetch
-// neonConfig.poolQueryViaFetch = true
+// Detect Neon Local proxy (localhost connection)
+const isLocalProxy = databaseUrl.includes("localhost");
+
+if (isLocalProxy) {
+  // Neon Local proxy requires HTTP mode with specific endpoint
+  // See: https://github.com/neondatabase/neon_local
+  neonConfig.fetchEndpoint = (host) => {
+    const protocol = host === "localhost" ? "http" : "https";
+    const port = host === "localhost" ? 5432 : 443;
+    return `${protocol}://${host}:${port}/sql`;
+  };
+  neonConfig.useSecureWebSocket = false;
+  neonConfig.pipelineConnect = false;
+}
 
 // databaseUrl respects DATABASE_URL_LOCAL > DATABASE_URL precedence
 // This enables transparent switching between Neon Local proxy and direct cloud connection
