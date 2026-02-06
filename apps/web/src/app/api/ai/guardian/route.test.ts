@@ -177,6 +177,7 @@ function createRequest(body: Record<string, unknown>): Request {
 }
 
 const UUID_REGEX = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/;
+const ELLIPSIS_SUFFIX_REGEX = /\.\.\.$/;
 
 const validBody = {
   messages: [{ role: "user", content: "test", id: "msg-1" }],
@@ -464,10 +465,12 @@ describe("Guardian Route Handler", () => {
       }
 
       const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
-      expect(updateReturn?.set).toHaveBeenCalledWith({
-        status: "completed",
-        outcome: "auto_approved",
-      });
+      expect(updateReturn?.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "completed",
+          outcome: "auto_approved",
+        })
+      );
     });
 
     it("break glass fallback: after() callback sets outcome to break_glass", async () => {
@@ -487,10 +490,12 @@ describe("Guardian Route Handler", () => {
       }
 
       const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
-      expect(updateReturn?.set).toHaveBeenCalledWith({
-        status: "completed",
-        outcome: "break_glass",
-      });
+      expect(updateReturn?.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "completed",
+          outcome: "break_glass",
+        })
+      );
     });
 
     it("degradation after() callback handles DB errors gracefully", async () => {
@@ -886,7 +891,10 @@ describe("Guardian Route Handler", () => {
       }
 
       const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
-      expect(updateReturn?.set).toHaveBeenCalledWith({ status: "completed" });
+      const setCall = updateReturn?.set.mock.calls[0]?.[0];
+      expect(setCall.status).toBe("completed");
+      expect(setCall.reasoningSummary).toBe("mock response text");
+      expect(setCall.outcome).toBeUndefined();
     });
 
     it("passes autoApproved to telemetry for analyst tier", async () => {
@@ -915,6 +923,242 @@ describe("Guardian Route Handler", () => {
         expect.objectContaining({ score: 70, reasoning: "test-therapist" }),
         "therapist",
         false
+      );
+    });
+  });
+
+  // ========================================================================
+  // Two-Phase Interaction Persistence (Story 3.7)
+  // ========================================================================
+
+  describe("two-phase interaction persistence (Story 3.7)", () => {
+    // Task 6.1: skeleton write includes all required fields with outcome: null
+    it("skeleton write includes outcome: null explicitly", async () => {
+      await POST(createRequest(validBody));
+      const insertReturn = mocks.mockInsert.mock.results[0]?.value;
+      expect(insertReturn?.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          cardId: "card-123",
+          tier: "analyst",
+          riskScore: 10,
+          status: "pending",
+          outcome: null,
+        })
+      );
+    });
+
+    it("skeleton write includes id field as UUID", async () => {
+      await POST(createRequest(validBody));
+      const insertReturn = mocks.mockInsert.mock.results[0]?.value;
+      expect(insertReturn?.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: expect.stringMatching(UUID_REGEX),
+        })
+      );
+    });
+
+    // Task 6.2: after() updates with status "completed" and reasoningSummary
+    it("after() callback includes reasoningSummary when stream succeeds (non-auto-approve)", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      expect(updateReturn?.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "completed",
+          reasoningSummary: "mock response text",
+        })
+      );
+    });
+
+    // Task 6.3: auto-approved after() includes reasoningSummary
+    it("after() callback includes auto-approve reasoningSummary for analyst tier", async () => {
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      expect(updateReturn?.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "completed",
+          outcome: "auto_approved",
+          reasoningSummary:
+            "Low-risk unlock request (score: 10). Auto-approved without intervention.",
+        })
+      );
+    });
+
+    // Task 6.2 continued: truncation at word boundary for long text
+    it("after() truncates reasoningSummary at last space before 500 chars with ellipsis", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+
+      // Create a long text that exceeds 500 chars
+      const longText = `${"word ".repeat(100)}end`;
+      mocks.streamResult.text = Promise.resolve(longText);
+
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      const setCall = updateReturn?.set.mock.calls[0]?.[0];
+      expect(setCall.reasoningSummary).toBeDefined();
+      expect(setCall.reasoningSummary.length).toBeLessThanOrEqual(504); // 500 + "..."
+      expect(setCall.reasoningSummary).toMatch(ELLIPSIS_SUFFIX_REGEX);
+    });
+
+    // Task 6.2 edge case: truncation with no spaces falls back to hard cut at 500
+    it("after() hard-cuts reasoningSummary at 500 chars when text has no spaces", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+
+      // Text with no spaces at all — lastIndexOf(" ", 500) returns -1
+      const noSpaceText = "x".repeat(800);
+      mocks.streamResult.text = Promise.resolve(noSpaceText);
+
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      const setCall = updateReturn?.set.mock.calls[0]?.[0];
+      expect(setCall.reasoningSummary).toBeDefined();
+      expect(setCall.reasoningSummary.length).toBe(503); // 500 + "..."
+      expect(setCall.reasoningSummary).toMatch(ELLIPSIS_SUFFIX_REGEX);
+    });
+
+    // Task 6.4 / Task 3.2: stream failure → covered by "after() skips status update
+    // when stream generation fails" test in after() callback section above.
+
+    // Task 3.3: skeleton record exists with null outcome when streaming never completes
+    it("skeleton record is created even when streaming never completes", async () => {
+      // Simulate a stream that never resolves
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: intentionally never-resolving promise
+      const neverResolving = new Promise<string>(() => {});
+      mocks.streamResult.text = neverResolving;
+
+      await POST(createRequest(validBody));
+
+      // The insert (skeleton write) should have been called
+      expect(mocks.mockInsert).toHaveBeenCalled();
+      const insertReturn = mocks.mockInsert.mock.results[0]?.value;
+      expect(insertReturn?.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "pending",
+          outcome: null,
+        })
+      );
+
+      // The after() callback was registered but hasn't resolved yet
+      expect(mocks.mockAfter).toHaveBeenCalledWith(expect.any(Function));
+    });
+
+    // Task 6.5: x-interaction-id on normal streaming response — covered by
+    // "includes x-interaction-id header (AC#10)" test in streaming response section above.
+
+    // Task 6.6: x-interaction-id on degraded analyst-only response
+    it("x-interaction-id header is present on degraded analyst-only response", async () => {
+      mocks.streamTextError = new Error("Model initialization failed");
+      const response = await POST(createRequest(validBody));
+      const interactionId = response.headers.get("x-interaction-id");
+      expect(interactionId).toBeTruthy();
+      expect(interactionId).toMatch(UUID_REGEX);
+    });
+
+    // Task 6.7: x-interaction-id on break-glass response
+    it("x-interaction-id header is present on break-glass response", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      mocks.streamTextError = new Error("Model initialization failed");
+      const response = await POST(createRequest(validBody));
+      const interactionId = response.headers.get("x-interaction-id");
+      expect(interactionId).toBeTruthy();
+      expect(interactionId).toMatch(UUID_REGEX);
+    });
+
+    // Task 6.8: degradation after() includes reasoningSummary
+    it("analyst-only degradation after() includes reasoningSummary describing the failure", async () => {
+      mocks.streamTextError = new Error("Model initialization failed");
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      expect(updateReturn?.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "completed",
+          outcome: "auto_approved",
+          reasoningSummary:
+            "System failure — analyst_only fallback activated. Reason: Model initialization failed",
+        })
+      );
+    });
+
+    it("break-glass degradation after() includes reasoningSummary describing the failure", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      mocks.streamTextError = new Error("Model initialization failed");
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      expect(updateReturn?.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "completed",
+          outcome: "break_glass",
+          reasoningSummary:
+            "System failure — break_glass fallback activated. Reason: Model initialization failed",
+        })
       );
     });
   });

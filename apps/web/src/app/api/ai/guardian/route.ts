@@ -131,6 +131,7 @@ export async function POST(req: Request) {
         tier,
         riskScore: riskResult.score,
         status: "pending",
+        outcome: null,
       }),
       DB_TIMEOUT_MS
     );
@@ -198,19 +199,33 @@ export async function POST(req: Request) {
     after(async () => {
       try {
         // Wait for stream to finish — if it errored, leave status as "pending"
+        let completedText: string;
         try {
-          await result.text;
+          completedText = await result.text;
         } catch {
           console.error(
             `[Guardian] Stream failed for interaction ${interactionId}, status left as pending`
           );
           return;
         }
+
+        // Extract reasoning summary for observability (NFR-O2)
+        let reasoningSummary: string;
+        if (isAutoApproved) {
+          reasoningSummary = `Low-risk unlock request (score: ${riskResult.score}). Auto-approved without intervention.`;
+        } else if (completedText.length <= 500) {
+          reasoningSummary = completedText;
+        } else {
+          const spaceIdx = completedText.lastIndexOf(" ", 500);
+          reasoningSummary = `${completedText.slice(0, spaceIdx === -1 ? 500 : spaceIdx)}...`;
+        }
+
         await db
           .update(interaction)
           .set({
             status: "completed",
             ...(isAutoApproved && { outcome: "auto_approved" }),
+            reasoningSummary,
           })
           .where(eq(interaction.id, interactionId));
       } catch (error) {
@@ -227,6 +242,7 @@ export async function POST(req: Request) {
 
     // Clone to add custom headers
     const headers2 = new Headers(response.headers);
+    // Client uses x-interaction-id to submit feedback via /api/ai/feedback (Epic 6)
     headers2.set("x-interaction-id", interactionId);
     headers2.set("x-guardian-tier", tier);
     if (isAutoApproved) {
@@ -261,7 +277,11 @@ export async function POST(req: Request) {
         try {
           await db
             .update(interaction)
-            .set({ status: "completed", outcome: "auto_approved" })
+            .set({
+              status: "completed",
+              outcome: "auto_approved",
+              reasoningSummary: `System failure — analyst_only fallback activated. Reason: ${failureReason}`,
+            })
             .where(eq(interaction.id, interactionId));
         } catch (updateError) {
           console.error(
@@ -286,7 +306,11 @@ export async function POST(req: Request) {
       try {
         await db
           .update(interaction)
-          .set({ status: "completed", outcome: "break_glass" })
+          .set({
+            status: "completed",
+            outcome: "break_glass",
+            reasoningSummary: `System failure — break_glass fallback activated. Reason: ${failureReason}`,
+          })
           .where(eq(interaction.id, interactionId));
       } catch (updateError) {
         console.error(
