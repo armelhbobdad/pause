@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
     "@opentelemetry/api",
     "@opentelemetry/sdk-node",
     "@opentelemetry/auto-instrumentations-node",
-    "@kayba/ace-framework",
+    "@pause/ace",
   ],
 };
 

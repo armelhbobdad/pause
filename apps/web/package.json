@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@ai-sdk/devtools": "^0.0.2",
+    "@pause/ace": "workspace:*",
     "@ai-sdk/google": "^3.0.1",
     "@ai-sdk/react": "^3.0.3",
     "@base-ui/react": "^1.0.0",
@@ -22,6 +23,7 @@
     "@opentelemetry/sdk-node": "^0.211.0",
     "@pause/api": "workspace:*",
     "@pause/auth": "workspace:*",
+    "@pause/db": "workspace:*",
     "@pause/env": "workspace:*",
     "@tanstack/react-form": "^1.27.3",
     "@tanstack/react-query": "^5.90.12",
@@ -35,6 +37,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.1",
     "lucide-react": "^0.546.0",
     "next": "catalog:",
     "next-themes": "^0.4.6",

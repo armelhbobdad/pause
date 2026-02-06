@@ -7,6 +7,19 @@
  */
 
 // ============================================================================
+// Guardian Tier
+// ============================================================================
+
+/**
+ * GuardianTier — determines the interaction complexity and prompt behavior.
+ *
+ * - analyst: Auto-approve, brief responses (Story 3.1)
+ * - negotiator: Savings-focused dialogue (Epic 4)
+ * - therapist: Reflection-based dialogue (Epic 5)
+ */
+export type GuardianTier = "analyst" | "negotiator" | "therapist";
+
+// ============================================================================
 // Reveal Type
 // ============================================================================
 

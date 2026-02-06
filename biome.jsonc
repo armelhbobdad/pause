@@ -4,5 +4,28 @@
     "ultracite/biome/core",
     "ultracite/biome/next",
     "ultracite/biome/react"
+  ],
+  "overrides": [
+    {
+      "includes": ["packages/ace/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "useAwait": "off"
+          },
+          "style": {
+            "noParameterProperties": "off",
+            "useFilenamingConvention": "off"
+          },
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off"
+          },
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
+      }
+    }
   ]
 }

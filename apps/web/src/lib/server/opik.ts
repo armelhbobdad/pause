@@ -35,9 +35,69 @@ export function getOpikClient(): Opik | null {
   return opikClient;
 }
 
-export function getGuardianTelemetry(interactionId: string): TelemetrySettings {
+export function logDegradationTrace(
+  interactionId: string,
+  degradationLevel: "analyst_only" | "break_glass",
+  failureReason: string,
+  riskMeta?: { score: number; reasoning: string },
+  tier?: string
+): void {
+  try {
+    const client = getOpikClient();
+    if (!client) {
+      return;
+    }
+
+    const trace = client.trace({
+      name: `guardian:system_failure:${degradationLevel}`,
+      input: {
+        interactionId,
+        tier,
+        failureReason,
+        degraded: true,
+        degradationLevel,
+        ...(riskMeta && {
+          riskScore: riskMeta.score,
+          riskReasoning: riskMeta.reasoning,
+        }),
+      },
+    });
+    trace.end();
+  } catch {
+    // Telemetry failures must never disrupt the degradation response
+  }
+}
+
+export function getGuardianTelemetry(
+  interactionId: string,
+  riskMeta?: { score: number; reasoning: string },
+  tier?: string,
+  autoApproved?: boolean,
+  degraded?: { level: "analyst_only" | "break_glass"; reason: string }
+): TelemetrySettings {
+  let traceName: string;
+  if (degraded) {
+    traceName = `guardian:system_failure:${degraded.level}`;
+  } else if (autoApproved) {
+    traceName = "guardian:analyst:auto_approved";
+  } else {
+    traceName = `guardian-${interactionId}`;
+  }
   return {
-    ...OpikExporter.getSettings({ name: `guardian-${interactionId}` }),
-    metadata: { interactionId },
+    ...OpikExporter.getSettings({ name: traceName }),
+    metadata: {
+      interactionId,
+      ...(riskMeta && {
+        riskScore: riskMeta.score,
+        riskReasoning: riskMeta.reasoning,
+      }),
+      ...(tier && { tier }),
+      ...(autoApproved && { autoApproved: true }),
+      ...(degraded && {
+        degraded: true,
+        degradationLevel: degraded.level,
+        failureReason: degraded.reason,
+      }),
+    },
   };
 }

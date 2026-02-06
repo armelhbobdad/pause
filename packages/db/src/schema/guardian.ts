@@ -37,6 +37,8 @@ export const interactionOutcomeEnum = pgEnum("interaction_outcome", [
   "overridden",
   "abandoned",
   "timeout",
+  "auto_approved",
+  "break_glass",
 ]);
 
 /** Card status */
