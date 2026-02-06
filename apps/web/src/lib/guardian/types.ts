@@ -70,3 +70,24 @@ export type InteractionOutcome =
  * ```
  */
 export type OnOutcomeCallback = (outcome: InteractionOutcome) => void;
+
+// ============================================================================
+// Best Offer (Negotiator Tier — Story 4.3)
+// ============================================================================
+
+/**
+ * BestOffer — the top-ranked coupon/deal selected by the offer-selection algorithm.
+ *
+ * Used by SavingsTicket (client) for display and by server tools for selection.
+ * Shared here so client components can import without pulling in server-only modules.
+ */
+export interface BestOffer {
+  code: string;
+  discount: string;
+  /** Parsed numeric discount in cents. 0 when value is unknowable (e.g., percentage without price context). */
+  discountCents: number;
+  type: "percentage" | "fixed" | "price_match";
+  source: string;
+  expiresAt: string | null;
+  selectionReasoning: string;
+}

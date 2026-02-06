@@ -1,15 +1,7 @@
+import type { BestOffer } from "@/lib/guardian/types";
 import type { CouponResult } from "./coupon-provider";
 
-export interface BestOffer {
-  code: string;
-  discount: string;
-  /** Parsed numeric discount in cents. 0 when value is unknowable (e.g., percentage without price context). */
-  discountCents: number;
-  type: "percentage" | "fixed" | "price_match";
-  source: string;
-  expiresAt: string | null;
-  selectionReasoning: string;
-}
+export type { BestOffer } from "@/lib/guardian/types";
 
 const DOLLAR_AMOUNT_PATTERN = /\$(\d+(?:\.\d+)?)/;
 const PERCENT_AMOUNT_PATTERN = /(\d+(?:\.\d+)?)%/;

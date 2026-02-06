@@ -87,3 +87,16 @@
   --font-data:
     var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
 }
+
+/* Savings Ticket Entry Animation (Story 4.3, UX-53, UX-04)
+   translateY(-12px) → 0 slide-up with fade-in over 800ms using --ease-out-expo */
+@keyframes savings-ticket-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
