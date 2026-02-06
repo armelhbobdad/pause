@@ -2,16 +2,33 @@ import { google } from "@ai-sdk/google";
 import { auth } from "@pause/auth";
 import { db } from "@pause/db";
 import { card, interaction } from "@pause/db/schema";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+  type UIMessage,
+} from "ai";
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import z from "zod";
 import { wrapSkillbookContext } from "@/lib/server/ace";
 import { ANALYST_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/analyst";
+import { NEGOTIATOR_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/negotiator";
+import { THERAPIST_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/therapist";
 import { assessRisk } from "@/lib/server/guardian/risk";
+import {
+  determineTier,
+  type InteractionTier,
+} from "@/lib/server/guardian/tiers";
 import { getGuardianTelemetry } from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
+
+const TIER_PROMPTS: Record<InteractionTier, string> = {
+  analyst: ANALYST_SYSTEM_PROMPT,
+  negotiator: NEGOTIATOR_SYSTEM_PROMPT,
+  therapist: THERAPIST_SYSTEM_PROMPT,
+};
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -98,6 +115,9 @@ export async function POST(req: Request) {
     serviceHealth.neon = false;
   }
 
+  // --- Tier determination (Story 3.3, AC#10) ---
+  const tier = determineTier(riskResult.score);
+
   // --- Skeleton interaction write (AC#9, ADR-006) ---
   try {
     await withTimeout(
@@ -105,7 +125,7 @@ export async function POST(req: Request) {
         id: interactionId,
         userId: session.user.id,
         cardId,
-        tier: "analyst",
+        tier,
         riskScore: riskResult.score,
         status: "pending",
       }),
@@ -121,10 +141,11 @@ export async function POST(req: Request) {
   // Currently the stub always returns "" — DB query deferred to avoid wasted roundtrip.
   const skillbookContext = wrapSkillbookContext();
 
-  // --- Build system prompt (AC#12, #13) ---
+  // --- Build tier-aware system prompt (Story 3.3, AC#1, #2, #3, #4) ---
+  const tierPrompt = TIER_PROMPTS[tier];
   const systemPrompt = skillbookContext
-    ? `${ANALYST_SYSTEM_PROMPT}\n\n${skillbookContext}`
-    : ANALYST_SYSTEM_PROMPT;
+    ? `${tierPrompt}\n\n${skillbookContext}`
+    : tierPrompt;
 
   // --- Stream response (AC#5, #6, #8, #11, #14, #15) ---
   // purchaseContext is prepended to model messages (not system prompt) to prevent
@@ -144,10 +165,21 @@ export async function POST(req: Request) {
       model: google("gemini-2.5-flash"),
       system: systemPrompt,
       messages: modelMessages,
-      experimental_telemetry: getGuardianTelemetry(interactionId, {
-        score: riskResult.score,
-        reasoning: riskResult.reasoning,
-      }),
+      prepareStep: () => {
+        // On step 0: tier already configured via system parameter above.
+        // On subsequent steps: maintain same tier configuration.
+        // TODO(Story 4.1/5.1): Return activeTools based on tier.
+        return {};
+      },
+      stopWhen: stepCountIs(5),
+      experimental_telemetry: getGuardianTelemetry(
+        interactionId,
+        {
+          score: riskResult.score,
+          reasoning: riskResult.reasoning,
+        },
+        tier
+      ),
       abortSignal: AbortSignal.timeout(10_000),
     });
 

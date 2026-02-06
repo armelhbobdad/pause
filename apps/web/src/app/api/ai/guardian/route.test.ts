@@ -103,6 +103,7 @@ vi.mock("ai", () => ({
     }
     return mocks.streamResult;
   }),
+  stepCountIs: vi.fn((n: number) => ({ type: "stepCount", count: n })),
 }));
 
 vi.mock("@ai-sdk/google", () => ({
@@ -139,6 +140,29 @@ vi.mock("@/lib/server/opik", () => ({
 vi.mock("@/lib/server/guardian/prompts/analyst", () => ({
   ANALYST_SYSTEM_PROMPT: "You are a test analyst prompt.",
 }));
+
+vi.mock("@/lib/server/guardian/prompts/negotiator", () => ({
+  NEGOTIATOR_SYSTEM_PROMPT: "You are a test negotiator prompt.",
+}));
+
+vi.mock("@/lib/server/guardian/prompts/therapist", () => ({
+  THERAPIST_SYSTEM_PROMPT: "You are a test therapist prompt.",
+}));
+
+vi.mock("@/lib/server/guardian/tiers", () => {
+  const realDetermineTier = (score: number) => {
+    if (score >= 70) {
+      return "therapist";
+    }
+    if (score >= 30) {
+      return "negotiator";
+    }
+    return "analyst";
+  };
+  return {
+    determineTier: vi.fn((score: number) => realDetermineTier(score)),
+  };
+});
 
 // --- Import the route handler ---
 import { maxDuration, POST, runtime } from "./route";
@@ -358,9 +382,10 @@ describe("Guardian Route Handler", () => {
     });
 
     it("after() skips status update when stream generation fails", async () => {
-      mocks.streamResult.text = Promise.reject(
-        new Error("Stream generation failed")
-      );
+      const rejected = Promise.reject(new Error("Stream generation failed"));
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: noop to prevent unhandled rejection warning
+      rejected.catch(() => {});
+      mocks.streamResult.text = rejected;
       const consoleSpy = vi
         .spyOn(console, "error")
         .mockImplementation(() => undefined);
@@ -434,12 +459,95 @@ describe("Guardian Route Handler", () => {
       );
     });
 
-    it("passes risk metadata to telemetry (AC#9)", async () => {
+    it("passes risk metadata and tier to telemetry (AC#9)", async () => {
       const { getGuardianTelemetry } = await import("@/lib/server/opik");
       await POST(createRequest(validBody));
       expect(getGuardianTelemetry).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ score: 10, reasoning: "test" })
+        expect.objectContaining({ score: 10, reasoning: "test" }),
+        "analyst"
+      );
+    });
+  });
+
+  // ========================================================================
+  // Tier routing (Story 3.3)
+  // ========================================================================
+
+  describe("tier routing (Story 3.3)", () => {
+    it("writes analyst tier to skeleton for score 10", async () => {
+      await POST(createRequest(validBody));
+      const insertReturn = mocks.mockInsert.mock.results[0]?.value;
+      expect(insertReturn?.values).toHaveBeenCalledWith(
+        expect.objectContaining({ tier: "analyst" })
+      );
+    });
+
+    it("writes negotiator tier to skeleton for score 50", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      await POST(createRequest(validBody));
+      const insertReturn = mocks.mockInsert.mock.results[0]?.value;
+      expect(insertReturn?.values).toHaveBeenCalledWith(
+        expect.objectContaining({ tier: "negotiator" })
+      );
+    });
+
+    it("writes therapist tier to skeleton for score 80", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 80,
+        factors: [],
+        reasoning: "test-therapist",
+        historyAvailable: true,
+      });
+      await POST(createRequest(validBody));
+      const insertReturn = mocks.mockInsert.mock.results[0]?.value;
+      expect(insertReturn?.values).toHaveBeenCalledWith(
+        expect.objectContaining({ tier: "therapist" })
+      );
+    });
+
+    it("passes prepareStep callback to streamText", async () => {
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prepareStep: expect.any(Function),
+        })
+      );
+    });
+
+    it("passes stopWhen to streamText", async () => {
+      const { streamText, stepCountIs } = await import("ai");
+      await POST(createRequest(validBody));
+      expect(stepCountIs).toHaveBeenCalledWith(5);
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stopWhen: expect.anything(),
+        })
+      );
+    });
+
+    it("passes tier to telemetry for negotiator (score 50)", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      const { getGuardianTelemetry } = await import("@/lib/server/opik");
+      await POST(createRequest(validBody));
+      expect(getGuardianTelemetry).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ score: 50, reasoning: "test-negotiator" }),
+        "negotiator"
       );
     });
   });
