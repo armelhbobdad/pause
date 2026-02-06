@@ -118,6 +118,9 @@ export async function POST(req: Request) {
   // --- Tier determination (Story 3.3, AC#10) ---
   const tier = determineTier(riskResult.score);
 
+  // --- Auto-approve detection (Story 3.5) ---
+  const isAutoApproved = tier === "analyst";
+
   // --- Skeleton interaction write (AC#9, ADR-006) ---
   try {
     await withTimeout(
@@ -178,14 +181,15 @@ export async function POST(req: Request) {
         // TODO(Story 4.1/5.1): Return activeTools based on tier.
         return {};
       },
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(isAutoApproved ? 1 : 5),
       experimental_telemetry: getGuardianTelemetry(
         interactionId,
         {
           score: riskResult.score,
           reasoning: riskResult.reasoning,
         },
-        tier
+        tier,
+        isAutoApproved
       ),
       abortSignal: AbortSignal.timeout(10_000),
     });
@@ -204,7 +208,10 @@ export async function POST(req: Request) {
         }
         await db
           .update(interaction)
-          .set({ status: "completed" })
+          .set({
+            status: "completed",
+            ...(isAutoApproved && { outcome: "auto_approved" }),
+          })
           .where(eq(interaction.id, interactionId));
       } catch (error) {
         console.error(
@@ -218,9 +225,13 @@ export async function POST(req: Request) {
     // --- Return stream with interactionId header (AC#10) ---
     const response = result.toUIMessageStreamResponse();
 
-    // Clone to add custom header
+    // Clone to add custom headers
     const headers2 = new Headers(response.headers);
     headers2.set("x-interaction-id", interactionId);
+    headers2.set("x-guardian-tier", tier);
+    if (isAutoApproved) {
+      headers2.set("x-guardian-auto-approved", "true");
+    }
 
     return new Response(response.body, {
       status: response.status,

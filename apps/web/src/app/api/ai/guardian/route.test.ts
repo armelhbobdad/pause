@@ -507,7 +507,8 @@ describe("Guardian Route Handler", () => {
       expect(getGuardianTelemetry).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ score: 10, reasoning: "test" }),
-        "analyst"
+        "analyst",
+        true
       );
     });
   });
@@ -567,8 +568,9 @@ describe("Guardian Route Handler", () => {
 
     it("passes stopWhen to streamText", async () => {
       const { streamText, stepCountIs } = await import("ai");
+      // Default mock assessRisk returns score 10 (analyst), so stepCountIs(1)
       await POST(createRequest(validBody));
-      expect(stepCountIs).toHaveBeenCalledWith(5);
+      expect(stepCountIs).toHaveBeenCalledWith(1);
       expect(streamText).toHaveBeenCalledWith(
         expect.objectContaining({
           stopWhen: expect.anything(),
@@ -589,7 +591,156 @@ describe("Guardian Route Handler", () => {
       expect(getGuardianTelemetry).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ score: 50, reasoning: "test-negotiator" }),
-        "negotiator"
+        "negotiator",
+        false
+      );
+    });
+  });
+
+  // ========================================================================
+  // Auto-approve flow (Story 3.5)
+  // ========================================================================
+
+  describe("auto-approve flow (Story 3.5)", () => {
+    it("includes x-guardian-auto-approved header for analyst tier (score < 30)", async () => {
+      const response = await POST(createRequest(validBody));
+      expect(response.headers.get("x-guardian-auto-approved")).toBe("true");
+    });
+
+    it("includes x-guardian-tier header set to analyst", async () => {
+      const response = await POST(createRequest(validBody));
+      expect(response.headers.get("x-guardian-tier")).toBe("analyst");
+    });
+
+    it("uses stepCountIs(1) for analyst tier", async () => {
+      const { stepCountIs } = await import("ai");
+      await POST(createRequest(validBody));
+      expect(stepCountIs).toHaveBeenCalledWith(1);
+    });
+
+    it("does NOT include x-guardian-auto-approved header for negotiator tier (score >= 30)", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      const response = await POST(createRequest(validBody));
+      expect(response.headers.get("x-guardian-auto-approved")).toBeNull();
+    });
+
+    it("uses stepCountIs(5) for non-analyst tiers", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      const { stepCountIs } = await import("ai");
+      await POST(createRequest(validBody));
+      expect(stepCountIs).toHaveBeenCalledWith(5);
+    });
+
+    it("sets x-guardian-tier header to negotiator for score 50", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      const response = await POST(createRequest(validBody));
+      expect(response.headers.get("x-guardian-tier")).toBe("negotiator");
+    });
+
+    it("boundary: score 29 auto-approves (analyst tier)", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 29,
+        factors: [],
+        reasoning: "test-boundary-29",
+        historyAvailable: true,
+      });
+      const response = await POST(createRequest(validBody));
+      expect(response.headers.get("x-guardian-auto-approved")).toBe("true");
+      expect(response.headers.get("x-guardian-tier")).toBe("analyst");
+    });
+
+    it("boundary: score 30 does NOT auto-approve (negotiator tier)", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 30,
+        factors: [],
+        reasoning: "test-boundary-30",
+        historyAvailable: true,
+      });
+      const response = await POST(createRequest(validBody));
+      expect(response.headers.get("x-guardian-auto-approved")).toBeNull();
+      expect(response.headers.get("x-guardian-tier")).toBe("negotiator");
+    });
+
+    it("after() callback sets outcome to auto_approved for analyst tier", async () => {
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      expect(updateReturn?.set).toHaveBeenCalledWith(
+        expect.objectContaining({ outcome: "auto_approved" })
+      );
+    });
+
+    it("after() callback does NOT set outcome for non-analyst tiers", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      expect(updateReturn?.set).toHaveBeenCalledWith({ status: "completed" });
+    });
+
+    it("passes autoApproved to telemetry for analyst tier", async () => {
+      const { getGuardianTelemetry } = await import("@/lib/server/opik");
+      await POST(createRequest(validBody));
+      expect(getGuardianTelemetry).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ score: 10, reasoning: "test" }),
+        "analyst",
+        true
+      );
+    });
+
+    it("passes autoApproved=false to telemetry for non-analyst tiers", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 70,
+        factors: [],
+        reasoning: "test-therapist",
+        historyAvailable: true,
+      });
+      const { getGuardianTelemetry } = await import("@/lib/server/opik");
+      await POST(createRequest(validBody));
+      expect(getGuardianTelemetry).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ score: 70, reasoning: "test-therapist" }),
+        "therapist",
+        false
       );
     });
   });

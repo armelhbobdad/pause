@@ -38,10 +38,14 @@ export function getOpikClient(): Opik | null {
 export function getGuardianTelemetry(
   interactionId: string,
   riskMeta?: { score: number; reasoning: string },
-  tier?: string
+  tier?: string,
+  autoApproved?: boolean
 ): TelemetrySettings {
+  const traceName = autoApproved
+    ? "guardian:analyst:auto_approved"
+    : `guardian-${interactionId}`;
   return {
-    ...OpikExporter.getSettings({ name: `guardian-${interactionId}` }),
+    ...OpikExporter.getSettings({ name: traceName }),
     metadata: {
       interactionId,
       ...(riskMeta && {
@@ -49,6 +53,7 @@ export function getGuardianTelemetry(
         riskReasoning: riskMeta.reasoning,
       }),
       ...(tier && { tier }),
+      ...(autoApproved && { autoApproved: true }),
     },
   };
 }

@@ -15,6 +15,13 @@
       "when": 1770310314775,
       "tag": "0001_pale_stark_industries",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770378995907,
+      "tag": "0002_deep_queen_noir",
+      "breakpoints": true
     }
   ]
 }

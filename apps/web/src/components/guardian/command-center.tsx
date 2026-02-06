@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { CardData } from "@/components/guardian/card-vault";
 import { CardVault } from "@/components/guardian/card-vault";
 import {
@@ -106,9 +107,16 @@ function CommandCenterInner({
     requestUnlock,
     onExpansionComplete,
     onCollapseComplete,
+    revealApproved,
     guardianError,
     relock,
   } = useGuardianState({ onTimeout });
+
+  // --- Auto-approve detection (Story 3.5) ---
+  // SDK v6 doesn't expose response headers via onFinish. We intercept them
+  // using a custom fetch wrapper on the transport, then dispatch the reveal
+  // action in the onFinish callback after the stream completes.
+  const autoApprovedRef = useRef(false);
 
   // --- useChat integration (Story 3.1, AC#18) ---
   // React Compiler memoizes the transport instance based on cardId stability.
@@ -117,8 +125,22 @@ function CommandCenterInner({
     transport: new DefaultChatTransport({
       api: "/api/ai/guardian",
       body: cardId ? { cardId } : undefined,
+      fetch: async (input, init) => {
+        const response = await fetch(input, init);
+        autoApprovedRef.current =
+          response.headers.get("x-guardian-auto-approved") === "true";
+        return response;
+      },
     }),
+    onFinish: () => {
+      if (autoApprovedRef.current) {
+        revealApproved();
+        toast.success("Auto-approved", { duration: 2000 });
+        autoApprovedRef.current = false;
+      }
+    },
     onError: () => {
+      autoApprovedRef.current = false;
       guardianError();
     },
   });
