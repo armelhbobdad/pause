@@ -12,13 +12,6 @@ import { useEffect, useReducer, useRef } from "react";
  */
 const DEFAULT_TIMEOUT_MS = 10_000;
 
-/**
- * Brief delay before auto-transitioning from expanding → active.
- * Allows animation to visually start before entering active state.
- * In Story 2.5, this will be replaced by actual animation onAnimationEnd.
- */
-const EXPANSION_AUTO_TRANSITION_MS = 50;
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -111,7 +104,7 @@ interface GuardianInternalState {
  * Guardian state machine reducer following Architecture guidelines.
  * Transitions:
  * - idle → expanding (user taps card via REQUEST_UNLOCK)
- * - expanding → active (animation completes via EXPANSION_COMPLETE or auto-transition)
+ * - expanding → active (CSS transitionend fires via EXPANSION_COMPLETE)
  * - active → collapsing (response received or timeout via RESPONSE_RECEIVED/TIMEOUT)
  * - active → revealed (Guardian approved via REVEAL_APPROVED)
  * - active → revealed (User override via REVEAL_OVERRIDE)
@@ -170,19 +163,29 @@ function guardianReducer(
  * useGuardianState - Guardian UI State Machine Hook
  *
  * Manages the Guardian's visual state machine with automatic timeout detection.
- * Used by the Guardian container component to coordinate CardVault pulse,
+ * Used by the CommandCenter component to coordinate CardVault pulse,
  * expansion animations, and response handling.
+ *
+ * The `expanding → active` transition is driven by the parent component calling
+ * `onExpansionComplete` from a CSS `transitionend` event — NOT a timer.
  *
  * @constraint FR11: 10-second timeout detection
  * @constraint Architecture: State managed via useReducer, not global state
  *
  * @example
  * ```tsx
- * const { state, isActive, requestUnlock } = useGuardianState({
+ * const { state, isActive, requestUnlock, onExpansionComplete } = useGuardianState({
  *   onTimeout: () => console.log("Guardian timed out")
  * });
  *
  * <CardVault isActive={isActive} onUnlockRequest={requestUnlock} />
+ * <GuardianConversation
+ *   isActive={isActive}
+ *   tier="negotiator"
+ *   onExpansionComplete={onExpansionComplete}
+ * >
+ *   {children}
+ * </GuardianConversation>
  * ```
  */
 const INITIAL_STATE: GuardianInternalState = {
@@ -196,9 +199,6 @@ export function useGuardianState(
   const { timeoutMs = DEFAULT_TIMEOUT_MS, onTimeout } = options;
   const [internalState, dispatch] = useReducer(guardianReducer, INITIAL_STATE);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const expansionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
 
   // Store latest onTimeout callback in ref to avoid effect re-runs when
   // consumers pass inline functions. The ref is always current when timeout fires.
@@ -213,24 +213,6 @@ export function useGuardianState(
   const isIdle = state === "idle";
   const isRevealed = state === "revealed";
   const revealType = internalState.revealType;
-
-  // Auto-transition from expanding → active after brief delay
-  // This ensures the pulse animation starts. In Story 2.5, this will be
-  // replaced by actual expansion animation's onAnimationEnd callback.
-  useEffect(() => {
-    if (state === "expanding") {
-      expansionTimeoutRef.current = setTimeout(() => {
-        dispatch({ type: "EXPANSION_COMPLETE" });
-      }, EXPANSION_AUTO_TRANSITION_MS);
-    }
-
-    return () => {
-      if (expansionTimeoutRef.current) {
-        clearTimeout(expansionTimeoutRef.current);
-        expansionTimeoutRef.current = null;
-      }
-    };
-  }, [state]);
 
   // Timeout detection for active state (FR11)
   useEffect(() => {
@@ -259,6 +241,9 @@ export function useGuardianState(
   }
 
   function onExpansionComplete() {
+    if (state !== "expanding") {
+      return;
+    }
     dispatch({ type: "EXPANSION_COMPLETE" });
   }
 
@@ -275,6 +260,9 @@ export function useGuardianState(
   }
 
   function onCollapseComplete() {
+    if (state !== "collapsing") {
+      return;
+    }
     dispatch({ type: "COLLAPSE_COMPLETE" });
   }
 

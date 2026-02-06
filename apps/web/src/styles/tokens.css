@@ -63,6 +63,11 @@
   --duration-reveal-override: 350ms; /* Override reveal: 300-400ms range (UX-35) */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1); /* Satisfying snap easing */
 
+  /* Guardian Tier Max Heights (UX-55)
+     ADR: Negotiator gets compact area (~5-6 lines); Therapist gets taller area (~8 lines) */
+  --guardian-max-height-negotiator: 250px;
+  --guardian-max-height-therapist: 350px;
+
   /* Guardian Pulse Animation Duration
      ADR: 2s cycle for subtle, non-distracting pulsing effect during active state */
   --pulse-duration: 2s;
