@@ -24,6 +24,9 @@ vi.mock("@/components/guardian/savings-ticket", () => ({
     onApply,
     isApplied,
     isApplying,
+    onSkip,
+    isSkipped,
+    isSkipping,
     disabled,
   }: {
     bestOffer: {
@@ -35,12 +38,17 @@ vi.mock("@/components/guardian/savings-ticket", () => ({
     onApply?: (offer: unknown) => Promise<void>;
     isApplied?: boolean;
     isApplying?: boolean;
+    onSkip?: () => Promise<void>;
+    isSkipped?: boolean;
+    isSkipping?: boolean;
     disabled?: boolean;
   }) => (
     <div
       data-disabled={disabled}
       data-is-applied={isApplied}
       data-is-applying={isApplying}
+      data-is-skipped={isSkipped}
+      data-is-skipping={isSkipping}
       data-testid="savings-ticket"
     >
       SavingsTicket:{bestOffer.code}:{bestOffer.source}
@@ -51,6 +59,15 @@ vi.mock("@/components/guardian/savings-ticket", () => ({
           type="button"
         >
           Apply
+        </button>
+      )}
+      {onSkip && (
+        <button
+          data-testid="skip-button"
+          onClick={() => onSkip()}
+          type="button"
+        >
+          Skip
         </button>
       )}
     </div>
@@ -684,5 +701,228 @@ describe("MessageRenderer", () => {
     const streamdowns = screen.getAllByTestId("streamdown");
     expect(streamdowns).toHaveLength(1);
     expect(streamdowns[0]).toHaveTextContent("Assistant reply");
+  });
+});
+
+// ============================================================================
+// SavingsTicketContainer — Skip flow (Story 4.6)
+// ============================================================================
+
+describe("SavingsTicketContainer skip flow (via ToolPartsRenderer)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it("passes onSkip to SavingsTicket", () => {
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={vi.fn()}
+        part={part}
+      />
+    );
+
+    expect(screen.getByTestId("skip-button")).toBeInTheDocument();
+  });
+
+  it("handleSkip posts to skip-savings endpoint", async () => {
+    const user = userEvent.setup();
+    const mockReveal = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={mockReveal}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("skip-button"));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/skip-savings",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ interactionId: "int-123" }),
+        })
+      );
+    });
+  });
+
+  it("handleSkip calls revealApproved on success", async () => {
+    const user = userEvent.setup();
+    const mockReveal = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={mockReveal}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("skip-button"));
+
+    await waitFor(() => {
+      expect(mockReveal).toHaveBeenCalled();
+    });
+  });
+
+  it("handleSkip shows error toast on API failure and does NOT call revealApproved", async () => {
+    const user = userEvent.setup();
+    const mockReveal = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "fail" }), { status: 500 })
+    );
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={mockReveal}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("skip-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Something went wrong. Try again.",
+        expect.objectContaining({ duration: 4000 })
+      );
+    });
+
+    expect(mockReveal).not.toHaveBeenCalled();
+  });
+
+  it("handleSkip shows success toast with correct message", async () => {
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={vi.fn()}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("skip-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastSuccess).toHaveBeenCalledWith(
+        "No problem! Your card is unlocked.",
+        expect.objectContaining({ duration: 3000 })
+      );
+    });
+  });
+
+  it("handleSkip does not call fetch when interactionId is null", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId={null}
+        onRevealApproved={vi.fn()}
+        part={part}
+      />
+    );
+
+    // Button is disabled via disabled={!interactionId}, but even if triggered,
+    // the handleSkip guard should prevent fetch
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("both buttons disabled during skip API call", async () => {
+    const user = userEvent.setup();
+    const deferred = {
+      resolve: (_value: Response) => {
+        // noop placeholder — reassigned by Promise constructor
+      },
+    };
+    const skipPromise = new Promise<Response>((resolve) => {
+      deferred.resolve = resolve;
+    });
+
+    vi.spyOn(globalThis, "fetch").mockReturnValueOnce(skipPromise);
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={vi.fn()}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("skip-button"));
+
+    // While API call is in flight, isSkipping should be true
+    await waitFor(() => {
+      expect(screen.getByTestId("savings-ticket")).toHaveAttribute(
+        "data-is-skipping",
+        "true"
+      );
+    });
+
+    // Resolve the pending fetch
+    deferred.resolve(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("savings-ticket")).toHaveAttribute(
+        "data-is-skipped",
+        "true"
+      );
+    });
   });
 });

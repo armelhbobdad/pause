@@ -7,6 +7,9 @@ import { SavingsTicket } from "./savings-ticket";
 const APPLY_UNLOCK_PATTERN = /Apply & Unlock/;
 const APPLIED_PATTERN = /Applied ✓/;
 const APPLYING_PATTERN = /Applying…/;
+const NO_THANKS_PATTERN = /No thanks/;
+const SKIPPED_PATTERN = /^Skipped$/;
+const SKIPPING_PATTERN = /Skipping…/;
 const CODE_SAVE35_PATTERN = /Code: SAVE35/;
 const VIA_TECHDEALS_PATTERN = /via TechDeals/;
 const PRICE_MATCH_FOUND_PATTERN = /Price match found/;
@@ -217,5 +220,131 @@ describe("SavingsTicket — action buttons", () => {
 
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByText(APPLY_UNLOCK_PATTERN)).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// Skip Button Tests (Story 4.6)
+// ============================================================================
+
+describe("SavingsTicket — skip button", () => {
+  it("renders No thanks button when onSkip is provided", () => {
+    const onSkip = vi.fn().mockResolvedValue(undefined);
+    render(<SavingsTicket bestOffer={makeBestOffer()} onSkip={onSkip} />);
+
+    expect(screen.getByText(NO_THANKS_PATTERN)).toBeInTheDocument();
+  });
+
+  it("skip button disabled and shows spinner when isSkipping=true", () => {
+    const onSkip = vi.fn().mockResolvedValue(undefined);
+    render(
+      <SavingsTicket
+        bestOffer={makeBestOffer()}
+        isSkipping={true}
+        onSkip={onSkip}
+      />
+    );
+
+    const buttons = screen.getAllByRole("button");
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+    }
+    expect(screen.getByText(SKIPPING_PATTERN)).toBeInTheDocument();
+  });
+
+  it("both buttons disabled when isApplying=true (mutual disable)", () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    const onSkip = vi.fn().mockResolvedValue(undefined);
+    render(
+      <SavingsTicket
+        bestOffer={makeBestOffer()}
+        isApplying={true}
+        onApply={onApply}
+        onSkip={onSkip}
+      />
+    );
+
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+    }
+  });
+
+  it("both buttons disabled when isSkipping=true (mutual disable)", () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    const onSkip = vi.fn().mockResolvedValue(undefined);
+    render(
+      <SavingsTicket
+        bestOffer={makeBestOffer()}
+        isSkipping={true}
+        onApply={onApply}
+        onSkip={onSkip}
+      />
+    );
+
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+    }
+  });
+
+  it("shows Skipped indicator when isSkipped=true", () => {
+    render(
+      <SavingsTicket
+        bestOffer={makeBestOffer()}
+        isSkipped={true}
+        onSkip={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(SKIPPED_PATTERN)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("calls onSkip when skip button clicked", async () => {
+    const user = userEvent.setup();
+    const onSkip = vi.fn().mockResolvedValue(undefined);
+    render(<SavingsTicket bestOffer={makeBestOffer()} onSkip={onSkip} />);
+
+    await user.click(screen.getByText(NO_THANKS_PATTERN));
+
+    expect(onSkip).toHaveBeenCalled();
+  });
+
+  it("skip button has correct aria-label", () => {
+    const onSkip = vi.fn().mockResolvedValue(undefined);
+    render(<SavingsTicket bestOffer={makeBestOffer()} onSkip={onSkip} />);
+
+    const skipButton = screen.getByLabelText("Skip savings and unlock card");
+    expect(skipButton).toBeInTheDocument();
+  });
+
+  it("no skip button when onSkip not provided (backward compat)", () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    render(<SavingsTicket bestOffer={makeBestOffer()} onApply={onApply} />);
+
+    expect(screen.queryByText(NO_THANKS_PATTERN)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+  });
+
+  it("both buttons disabled when disabled=true", () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    const onSkip = vi.fn().mockResolvedValue(undefined);
+    render(
+      <SavingsTicket
+        bestOffer={makeBestOffer()}
+        disabled={true}
+        onApply={onApply}
+        onSkip={onSkip}
+      />
+    );
+
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+    }
   });
 });

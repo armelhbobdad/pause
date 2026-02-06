@@ -45,6 +45,8 @@ function SavingsTicketContainer({
 }: SavingsTicketContainerProps) {
   const [isApplied, setIsApplied] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [isSkipped, setIsSkipped] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
 
   const handleApply = async (offer: BestOffer) => {
     if (!interactionId) {
@@ -103,13 +105,43 @@ function SavingsTicketContainer({
     }
   };
 
+  const handleSkip = async () => {
+    if (!interactionId) {
+      return;
+    }
+    setIsSkipping(true);
+
+    try {
+      const response = await fetch("/api/ai/guardian/skip-savings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ interactionId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("API call failed");
+      }
+
+      toast.success("No problem! Your card is unlocked.", { duration: 3000 });
+      setIsSkipping(false);
+      setIsSkipped(true);
+      onRevealApproved?.();
+    } catch {
+      toast.error("Something went wrong. Try again.", { duration: 4000 });
+      setIsSkipping(false);
+    }
+  };
+
   return (
     <SavingsTicket
       bestOffer={bestOffer}
       disabled={!interactionId}
       isApplied={isApplied}
       isApplying={isApplying}
+      isSkipped={isSkipped}
+      isSkipping={isSkipping}
       onApply={handleApply}
+      onSkip={handleSkip}
     />
   );
 }

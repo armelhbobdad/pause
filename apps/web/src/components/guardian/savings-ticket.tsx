@@ -6,6 +6,9 @@ export interface SavingsTicketProps {
   onApply?: (bestOffer: BestOffer) => Promise<void>;
   isApplied?: boolean;
   isApplying?: boolean;
+  onSkip?: () => Promise<void>;
+  isSkipped?: boolean;
+  isSkipping?: boolean;
   disabled?: boolean;
 }
 
@@ -49,12 +52,152 @@ function buildAriaLabel(bestOffer: BestOffer): string {
   return `Savings found: ${amount} with code ${bestOffer.code}`;
 }
 
+function Spinner({ borderColor }: { borderColor: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: "inline-block",
+        width: "1rem",
+        height: "1rem",
+        border: `2px solid ${borderColor}`,
+        borderTopColor: "transparent",
+        borderRadius: "50%",
+        animation: "spin 0.6s linear infinite",
+      }}
+    />
+  );
+}
+
+interface ActionButtonsProps {
+  bestOffer: BestOffer;
+  onApply?: (bestOffer: BestOffer) => Promise<void>;
+  isApplying?: boolean;
+  onSkip?: () => Promise<void>;
+  isSkipping?: boolean;
+  disabled?: boolean;
+}
+
+function ActionButtons({
+  bestOffer,
+  onApply,
+  isApplying,
+  onSkip,
+  isSkipping,
+  disabled,
+}: ActionButtonsProps) {
+  const isDisabled = isApplying || isSkipping || disabled;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "0.5rem",
+        marginTop: "0.75rem",
+      }}
+    >
+      {onApply && (
+        <button
+          aria-label="Apply coupon and unlock card"
+          disabled={isDisabled}
+          onClick={() => onApply(bestOffer)}
+          style={{
+            display: "flex",
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            minHeight: "44px",
+            padding: "0.625rem 1rem",
+            border: "none",
+            borderRadius: "0.375rem",
+            backgroundColor: "var(--savings-gold)",
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "0.875rem",
+            cursor: isDisabled ? "not-allowed" : "pointer",
+            opacity: isDisabled ? 0.6 : 1,
+          }}
+          type="button"
+        >
+          {isApplying ? (
+            <>
+              <Spinner borderColor="white" />
+              Applying…
+            </>
+          ) : (
+            "Apply & Unlock"
+          )}
+        </button>
+      )}
+      {onSkip && (
+        <button
+          aria-label="Skip savings and unlock card"
+          disabled={isDisabled}
+          onClick={() => onSkip()}
+          style={{
+            display: "flex",
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            minHeight: "44px",
+            padding: "0.625rem 1rem",
+            border: "2px solid var(--savings-gold)",
+            borderRadius: "0.375rem",
+            backgroundColor: "transparent",
+            color: "var(--savings-gold)",
+            fontWeight: "bold",
+            fontSize: "0.875rem",
+            cursor: isDisabled ? "not-allowed" : "pointer",
+            opacity: isDisabled ? 0.6 : 1,
+          }}
+          type="button"
+        >
+          {isSkipping ? (
+            <>
+              <Spinner borderColor="var(--savings-gold)" />
+              Skipping…
+            </>
+          ) : (
+            "No thanks"
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function StatusIndicator({ text, color }: { text: string; color: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "0.375rem",
+        width: "100%",
+        marginTop: "0.75rem",
+        padding: "0.625rem 1rem",
+        color,
+        fontWeight: "bold",
+        fontSize: "0.875rem",
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
 export function SavingsTicket({
   bestOffer,
   className,
   onApply,
   isApplied,
   isApplying,
+  onSkip,
+  isSkipped,
+  isSkipping,
   disabled,
 }: SavingsTicketProps) {
   if (!bestOffer) {
@@ -64,6 +207,8 @@ export function SavingsTicket({
   const isPriceMatch = bestOffer.type === "price_match";
   const displayAmount = formatDisplayAmount(bestOffer);
   const ariaLabel = buildAriaLabel(bestOffer);
+  const hasActions = onApply || onSkip;
+  const showButtons = hasActions && !isApplied && !isSkipped;
 
   return (
     <output
@@ -127,70 +272,23 @@ export function SavingsTicket({
         )}
       </div>
 
-      {onApply && !isApplied && (
-        <button
-          aria-label="Apply coupon and unlock card"
-          disabled={isApplying || disabled}
-          onClick={() => onApply(bestOffer)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.5rem",
-            width: "100%",
-            minHeight: "44px",
-            marginTop: "0.75rem",
-            padding: "0.625rem 1rem",
-            border: "none",
-            borderRadius: "0.375rem",
-            backgroundColor: "var(--savings-gold)",
-            color: "white",
-            fontWeight: "bold",
-            fontSize: "0.875rem",
-            cursor: isApplying || disabled ? "not-allowed" : "pointer",
-            opacity: isApplying || disabled ? 0.6 : 1,
-          }}
-          type="button"
-        >
-          {isApplying ? (
-            <>
-              <span
-                aria-hidden="true"
-                style={{
-                  display: "inline-block",
-                  width: "1rem",
-                  height: "1rem",
-                  border: "2px solid white",
-                  borderTopColor: "transparent",
-                  borderRadius: "50%",
-                  animation: "spin 0.6s linear infinite",
-                }}
-              />
-              Applying…
-            </>
-          ) : (
-            "Apply & Unlock"
-          )}
-        </button>
+      {showButtons && (
+        <ActionButtons
+          bestOffer={bestOffer}
+          disabled={disabled}
+          isApplying={isApplying}
+          isSkipping={isSkipping}
+          onApply={onApply}
+          onSkip={onSkip}
+        />
       )}
 
       {isApplied && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.375rem",
-            width: "100%",
-            marginTop: "0.75rem",
-            padding: "0.625rem 1rem",
-            color: "var(--savings-gold)",
-            fontWeight: "bold",
-            fontSize: "0.875rem",
-          }}
-        >
-          Applied ✓
-        </div>
+        <StatusIndicator color="var(--savings-gold)" text="Applied ✓" />
+      )}
+
+      {!isApplied && isSkipped && (
+        <StatusIndicator color="var(--text-secondary, #888)" text="Skipped" />
       )}
     </output>
   );
