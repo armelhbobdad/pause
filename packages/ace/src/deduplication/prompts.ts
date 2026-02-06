@@ -2,7 +2,7 @@
  * Prompts and report generation for skill deduplication.
  */
 
-import type { Skill } from "../skillbook.js";
+import type { Skill } from "../skillbook";
 
 const SIMILARITY_REPORT_HEADER = `
 ## Similar Skills Detected

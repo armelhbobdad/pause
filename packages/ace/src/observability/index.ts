@@ -10,6 +10,6 @@ export {
   getIntegration,
   OPIK_AVAILABLE,
   OpikIntegration,
-} from "./opik_integration.js";
+} from "./opik_integration";
 
-export { aceTrack, maybeTrack, trackRole } from "./tracers.js";
+export { aceTrack, maybeTrack, trackRole } from "./tracers";

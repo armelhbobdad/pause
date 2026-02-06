@@ -5,16 +5,16 @@
  * embeddings and SkillManager-driven consolidation decisions.
  */
 
-export type { DeduplicationConfig, EmbeddingProvider } from "./config.js";
-export { createDeduplicationConfig } from "./config.js";
-export { SimilarityDetector } from "./detector.js";
-export { DeduplicationManager } from "./manager.js";
+export type { DeduplicationConfig, EmbeddingProvider } from "./config";
+export { createDeduplicationConfig } from "./config";
+export { SimilarityDetector } from "./detector";
+export { DeduplicationManager } from "./manager";
 export type {
   ConsolidationOperation,
   DeleteOp,
   KeepOp,
   MergeOp,
   UpdateOp,
-} from "./operations.js";
-export { applyConsolidationOperations } from "./operations.js";
-export { formatPairForLogging, generateSimilarityReport } from "./prompts.js";
+} from "./operations";
+export { applyConsolidationOperations } from "./operations";
+export { formatPairForLogging, generateSimilarityReport } from "./prompts";

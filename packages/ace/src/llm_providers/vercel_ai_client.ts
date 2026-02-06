@@ -4,7 +4,7 @@
  */
 
 import { generateText, type LanguageModel } from "ai";
-import { LLMClient, type LLMResponse } from "../llm.js";
+import { LLMClient, type LLMResponse } from "../llm";
 
 /**
  * Configuration for Vercel AI client.

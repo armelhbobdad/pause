@@ -4,7 +4,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import type { UpdateBatch, UpdateOperation } from "./updates.js";
+import type { UpdateBatch, UpdateOperation } from "./updates";
 
 export interface SimilarityDecision {
   /** Record of a SkillManager decision to KEEP two skills separate */

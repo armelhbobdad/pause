@@ -11,15 +11,15 @@
  *                (parallel)        (parallel)
  */
 
-import type { EnvironmentResult, Sample } from "./adaptation.js";
+import type { EnvironmentResult, Sample } from "./adaptation";
 import type {
   AgentOutput,
   Reflector,
   ReflectorOutput,
   SkillManager,
-} from "./roles.js";
-import type { Skillbook } from "./skillbook.js";
-import type { UpdateBatch } from "./updates.js";
+} from "./roles";
+import type { Skillbook } from "./skillbook";
+import type { UpdateBatch } from "./updates";
 
 // ---------------------------------------------------------------------------
 // Data Classes

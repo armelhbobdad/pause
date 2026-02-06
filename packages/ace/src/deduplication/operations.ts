@@ -2,7 +2,7 @@
  * Consolidation operations for skill deduplication.
  */
 
-import type { SimilarityDecision, Skillbook } from "../skillbook.js";
+import type { SimilarityDecision, Skillbook } from "../skillbook";
 
 const logger = {
   info: (msg: string) => console.log(`[INFO] ${msg}`),

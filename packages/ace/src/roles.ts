@@ -3,14 +3,14 @@
  */
 
 import { z } from "zod";
-import type { LLMClient } from "./llm.js";
+import type { LLMClient } from "./llm";
 import {
   createAgentPrompt,
   createReflectorPrompt,
   createSkillManagerPrompt,
-} from "./prompts.js";
-import type { Skillbook } from "./skillbook.js";
-import { type UpdateBatch, updateBatchFromJSON } from "./updates.js";
+} from "./prompts";
+import type { Skillbook } from "./skillbook";
+import { type UpdateBatch, updateBatchFromJSON } from "./updates";
 
 // ================================
 // UTILITY FUNCTIONS

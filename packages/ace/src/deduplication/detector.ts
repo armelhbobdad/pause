@@ -2,10 +2,10 @@
  * Similarity detection for skill deduplication.
  */
 
-import { hasNumpy, hasSentenceTransformers, hasVercelAI } from "../features.js";
-import type { Skill, Skillbook } from "../skillbook.js";
-import type { DeduplicationConfig } from "./config.js";
-import { createDeduplicationConfig } from "./config.js";
+import { hasNumpy, hasSentenceTransformers, hasVercelAI } from "../features";
+import type { Skill, Skillbook } from "../skillbook";
+import type { DeduplicationConfig } from "./config";
+import { createDeduplicationConfig } from "./config";
 
 const logger = {
   info: (msg: string) => console.log(`[INFO] ${msg}`),
@@ -18,7 +18,6 @@ export class SimilarityDetector {
    * Detect similar skill pairs using cosine similarity on embeddings.
    */
   config: DeduplicationConfig;
-  private _model: any = null; // Lazy load sentence-transformers model
 
   constructor(config?: DeduplicationConfig) {
     this.config = config || createDeduplicationConfig();
@@ -167,15 +166,10 @@ export class SimilarityDetector {
   }
 
   private async _getSentenceTransformerModel(): Promise<any> {
-    /**
-     * Lazy load sentence-transformers model.
-     */
-    if (this._model === null) {
-      // @ts-expect-error - sentence-transformers is an optional dependency
-      const { SentenceTransformer } = await import("sentence-transformers");
-      this._model = new SentenceTransformer(this.config.localModelName);
-    }
-    return this._model;
+    // sentence-transformers is a Python-only package — not available in Node.js
+    throw new Error(
+      "sentence-transformers is not available in Node.js environments"
+    );
   }
 
   cosineSimilarity(a: number[], b: number[]): number {

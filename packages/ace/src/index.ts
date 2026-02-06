@@ -11,19 +11,19 @@ export type {
   OfflineACERunOptions,
   Sample,
   TaskEnvironment,
-} from "./adaptation.js";
-export { OfflineACE, OnlineACE, SimpleEnvironment } from "./adaptation.js";
+} from "./adaptation";
+export { OfflineACE, OnlineACE, SimpleEnvironment } from "./adaptation";
 // Async learning infrastructure
 export type {
   AsyncLearningPipelineOptions,
   AsyncLearningPipelineStats,
   LearningTask,
   ReflectionResult,
-} from "./async_learning.js";
+} from "./async_learning";
 export {
   AsyncLearningPipeline,
   ThreadSafeSkillbook,
-} from "./async_learning.js";
+} from "./async_learning";
 // Deduplication system
 export type {
   ConsolidationOperation,
@@ -33,7 +33,7 @@ export type {
   KeepOp,
   MergeOp,
   UpdateOp,
-} from "./deduplication/index.js";
+} from "./deduplication/index";
 export {
   applyConsolidationOperations,
   createDeduplicationConfig,
@@ -41,7 +41,7 @@ export {
   formatPairForLogging,
   generateSimilarityReport,
   SimilarityDetector,
-} from "./deduplication/index.js";
+} from "./deduplication/index";
 // Feature detection utilities
 export {
   clearFeatureCache,
@@ -56,20 +56,20 @@ export {
   hasVercelAI,
   hasZod,
   printFeatureStatus,
-} from "./features.js";
+} from "./features";
 // Integration utilities for external agents
-export { wrapSkillbookContext } from "./integrations/base.js";
+export { wrapSkillbookContext } from "./integrations/base";
 // Simple integration class (similar to ACELiteLLM)
-export { ACEAgent } from "./integrations/simple.js";
+export { ACEAgent } from "./integrations/simple";
 // LLM clients
-export type { LLMClient, LLMResponse } from "./llm.js";
-export { createLLMClient, DummyLLMClient, VercelAIClient } from "./llm.js";
+export type { LLMClient, LLMResponse } from "./llm";
+export { createLLMClient, DummyLLMClient, VercelAIClient } from "./llm";
 // LLM Provider implementations
-export type { VercelAIConfig } from "./llm_providers/index.js";
+export type { VercelAIConfig } from "./llm_providers/index";
 export {
   createVercelAIClient,
   VercelAIClient as VercelAIProviderClient,
-} from "./llm_providers/index.js";
+} from "./llm_providers/index";
 // Observability system (optional - requires 'opik' package)
 export {
   aceTrack,
@@ -79,7 +79,7 @@ export {
   OPIK_AVAILABLE,
   OpikIntegration,
   trackRole,
-} from "./observability/index.js";
+} from "./observability/index";
 // Prompts v1 (basic)
 export {
   createAgentPrompt,
@@ -87,8 +87,8 @@ export {
   createSkillManagerPrompt,
   SKILLBOOK_USAGE_INSTRUCTIONS,
   wrapSkillbookForExternalAgent,
-} from "./prompts.js";
-export type { PromptVersions, ValidationResult } from "./prompts_v2.js";
+} from "./prompts";
+export type { PromptVersions, ValidationResult } from "./prompts_v2";
 // Prompts v2 (advanced)
 export {
   AGENT_CODE_PROMPT,
@@ -103,7 +103,7 @@ export {
   REFLECTOR_V2_PROMPT,
   SKILL_MANAGER_V2_PROMPT,
   validatePromptOutput,
-} from "./prompts_v2.js";
+} from "./prompts_v2";
 // Prompts v2.1 (state-of-the-art - RECOMMENDED, +17% success rate)
 export {
   AGENT_CODE_V2_1_PROMPT,
@@ -117,20 +117,20 @@ export {
   SKILLBOOK_USAGE_INSTRUCTIONS as SKILLBOOK_USAGE_INSTRUCTIONS_V21,
   validatePromptOutputV21,
   wrapSkillbookForExternalAgent as wrapSkillbookForExternalAgentV21,
-} from "./prompts_v2_1.js";
+} from "./prompts_v2_1";
 // Roles
-export type { AgentOutput, ReflectorOutput } from "./roles.js";
+export type { AgentOutput, ReflectorOutput } from "./roles";
 export {
   Agent,
   extractCitedSkillIds,
   Reflector,
   ReplayAgent,
   SkillManager,
-} from "./roles.js";
+} from "./roles";
 // Core exports
-export type { SimilarityDecision, Skill } from "./skillbook.js";
-export { createSkill, Skillbook, skillToLLMDict } from "./skillbook.js";
-export type { OperationType, UpdateBatch, UpdateOperation } from "./updates.js";
+export type { SimilarityDecision, Skill } from "./skillbook";
+export { createSkill, Skillbook, skillToLLMDict } from "./skillbook";
+export type { OperationType, UpdateBatch, UpdateOperation } from "./updates";
 export {
   createUpdateBatch,
   createUpdateOperation,
@@ -138,4 +138,4 @@ export {
   updateBatchToJSON,
   updateOperationFromJSON,
   updateOperationToJSON,
-} from "./updates.js";
+} from "./updates";

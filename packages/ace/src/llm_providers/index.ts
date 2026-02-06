@@ -7,4 +7,4 @@ export {
   createVercelAIClient,
   VercelAIClient,
   type VercelAIConfig,
-} from "./vercel_ai_client.js";
+} from "./vercel_ai_client";

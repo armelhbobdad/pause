@@ -789,7 +789,7 @@ export class PromptManager {
         );
       }
       // Reference to v1 prompts
-      const { AGENT_PROMPT } = require("./prompts.js");
+      const { AGENT_PROMPT } = require("./prompts");
       prompt = AGENT_PROMPT;
     }
 
@@ -823,7 +823,7 @@ export class PromptManager {
           "prompts_v2_1 not yet ported. Use version 2.0 for now."
         );
       }
-      const { REFLECTOR_PROMPT } = require("./prompts.js");
+      const { REFLECTOR_PROMPT } = require("./prompts");
       prompt = REFLECTOR_PROMPT;
     }
 
@@ -847,7 +847,7 @@ export class PromptManager {
           "prompts_v2_1 not yet ported. Use version 2.0 for now."
         );
       }
-      const { SKILL_MANAGER_PROMPT } = require("./prompts.js");
+      const { SKILL_MANAGER_PROMPT } = require("./prompts");
       prompt = SKILL_MANAGER_PROMPT;
     }
 

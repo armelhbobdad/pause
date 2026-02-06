@@ -13,7 +13,7 @@
  * Based on ACE v2.0 architecture with MCP presentation enhancements.
  */
 
-import type { Skillbook } from "./skillbook.js";
+import type { Skillbook } from "./skillbook";
 
 // ================================
 // SHARED CONSTANTS

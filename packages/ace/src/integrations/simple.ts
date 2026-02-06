@@ -3,9 +3,9 @@
  */
 
 import type { LanguageModel } from "ai";
-import { VercelAIClient } from "../llm.js";
-import { Agent, Reflector, SkillManager } from "../roles.js";
-import { Skillbook } from "../skillbook.js";
+import { VercelAIClient } from "../llm";
+import { Agent, Reflector, SkillManager } from "../roles";
+import { Skillbook } from "../skillbook";
 
 export interface ACEAgentConfig {
   /** The language model to use (from Vercel AI SDK) */

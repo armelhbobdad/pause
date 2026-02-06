@@ -2,10 +2,10 @@
  * Deduplication manager for coordinating similarity detection and operations.
  */
 
-import type { Skillbook } from "../skillbook.js";
-import type { DeduplicationConfig } from "./config.js";
-import { createDeduplicationConfig } from "./config.js";
-import { SimilarityDetector } from "./detector.js";
+import type { Skillbook } from "../skillbook";
+import type { DeduplicationConfig } from "./config";
+import { createDeduplicationConfig } from "./config";
+import { SimilarityDetector } from "./detector";
 import {
   applyConsolidationOperations,
   type ConsolidationOperation,
@@ -13,8 +13,8 @@ import {
   type KeepOp,
   type MergeOp,
   type UpdateOp,
-} from "./operations.js";
-import { formatPairForLogging, generateSimilarityReport } from "./prompts.js";
+} from "./operations";
+import { formatPairForLogging, generateSimilarityReport } from "./prompts";
 
 const logger = {
   info: (msg: string) => console.log(`[INFO] ${msg}`),
