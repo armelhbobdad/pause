@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // --- Hoisted mocks ---
 const mocks = vi.hoisted(() => ({
   mockSearchCoupons: vi.fn(),
+  mockSelectBestOffer: vi.fn(),
 }));
 
 // --- Mock server-only ---
@@ -36,6 +37,11 @@ vi.mock("./coupon-provider", () => ({
   searchCoupons: mocks.mockSearchCoupons,
 }));
 
+// --- Mock offer selection ---
+vi.mock("./offer-selection", () => ({
+  selectBestOffer: mocks.mockSelectBestOffer,
+}));
+
 import { searchCouponsTool } from "./coupon-search";
 
 describe("coupon-search tool", () => {
@@ -43,8 +49,48 @@ describe("coupon-search tool", () => {
     vi.clearAllMocks();
   });
 
-  // Test 6.8: execute handler catches provider errors and returns error object
-  it("execute handler catches provider errors and returns error object instead of throwing", async () => {
+  it("execute handler returns bestOffer from selectBestOffer on success", async () => {
+    const mockResults = [
+      {
+        code: "TECH20",
+        discount: "20% off",
+        type: "percentage",
+        source: "TechDeals",
+        expiresAt: new Date().toISOString(),
+      },
+    ];
+    const mockBestOffer = {
+      code: "TECH20",
+      discount: "20% off",
+      discountCents: 2000,
+      type: "percentage",
+      source: "TechDeals",
+      expiresAt: new Date().toISOString(),
+      selectionReasoning: "Selected TECH20 (20% off) from TechDeals",
+    };
+    mocks.mockSearchCoupons.mockResolvedValueOnce(mockResults);
+    mocks.mockSelectBestOffer.mockReturnValueOnce(mockBestOffer);
+
+    const executeHandler = (
+      searchCouponsTool as unknown as {
+        execute: (params: Record<string, unknown>) => Promise<unknown>;
+      }
+    ).execute;
+    const result = await executeHandler({
+      merchant: "BestBuy",
+      category: "electronics",
+      price: 100,
+    });
+
+    expect(result).toEqual({
+      bestOffer: mockBestOffer,
+      allResultsCount: 1,
+      selectionReasoning: "Selected TECH20 (20% off) from TechDeals",
+    });
+    expect(mocks.mockSelectBestOffer).toHaveBeenCalledWith(mockResults, 100);
+  });
+
+  it("execute handler returns null bestOffer on provider error", async () => {
     mocks.mockSearchCoupons.mockRejectedValueOnce(
       new Error("Provider timeout")
     );
@@ -63,8 +109,9 @@ describe("coupon-search tool", () => {
     });
 
     expect(result).toEqual({
-      results: [],
-      error: "Coupon search unavailable",
+      bestOffer: null,
+      allResultsCount: 0,
+      selectionReasoning: "Coupon search unavailable",
     });
     expect(consoleSpy).toHaveBeenCalledWith(
       "[Guardian] Coupon search failed:",
@@ -72,31 +119,5 @@ describe("coupon-search tool", () => {
     );
 
     consoleSpy.mockRestore();
-  });
-
-  // Test: execute handler returns results on success
-  it("execute handler returns results from provider on success", async () => {
-    const mockResults = [
-      {
-        code: "TECH20",
-        discount: "20% off",
-        type: "percentage",
-        source: "TechDeals",
-        expiresAt: new Date().toISOString(),
-      },
-    ];
-    mocks.mockSearchCoupons.mockResolvedValueOnce(mockResults);
-
-    const executeHandler = (
-      searchCouponsTool as unknown as {
-        execute: (params: Record<string, unknown>) => Promise<unknown>;
-      }
-    ).execute;
-    const result = await executeHandler({
-      merchant: "BestBuy",
-      category: "electronics",
-    });
-
-    expect(result).toEqual({ results: mockResults });
   });
 });

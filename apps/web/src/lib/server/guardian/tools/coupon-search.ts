@@ -2,6 +2,7 @@ import "server-only";
 import { tool } from "ai";
 import z from "zod";
 import { searchCoupons } from "./coupon-provider";
+import { selectBestOffer } from "./offer-selection";
 
 const SEARCH_TIMEOUT_MS = 2000;
 
@@ -30,10 +31,20 @@ export const searchCouponsTool = tool({
           )
         ),
       ]);
-      return { results };
+      const bestOffer = selectBestOffer(results, price);
+      return {
+        bestOffer,
+        allResultsCount: results.length,
+        selectionReasoning: bestOffer?.selectionReasoning ?? "No offers found",
+      };
     } catch (error) {
+      // TODO(Epic-4): Replace with structured Opik trace logging
       console.warn("[Guardian] Coupon search failed:", error);
-      return { results: [], error: "Coupon search unavailable" };
+      return {
+        bestOffer: null,
+        allResultsCount: 0,
+        selectionReasoning: "Coupon search unavailable",
+      };
     }
   },
 });

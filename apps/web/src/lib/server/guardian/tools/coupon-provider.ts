@@ -30,6 +30,18 @@ const MOCK_COUPONS: Record<string, Omit<CouponResult, "expiresAt">[]> = {
       type: "percentage",
       source: "TechDeals",
     },
+    {
+      code: "ELEC10",
+      discount: "$10 off",
+      type: "fixed",
+      source: "DealFinder",
+    },
+    {
+      code: "PRICEMATCH",
+      discount: "$15 off",
+      type: "price_match",
+      source: "PriceWatch",
+    },
   ],
   fashion: [
     {
@@ -37,6 +49,12 @@ const MOCK_COUPONS: Record<string, Omit<CouponResult, "expiresAt">[]> = {
       discount: "15% off",
       type: "percentage",
       source: "FashionSaver",
+    },
+    {
+      code: "TREND5",
+      discount: "$5 off",
+      type: "fixed",
+      source: "DealFinder",
     },
   ],
   grocery: [],

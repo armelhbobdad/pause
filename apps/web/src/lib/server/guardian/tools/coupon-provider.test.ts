@@ -107,14 +107,14 @@ describe("coupon-provider", () => {
     );
   });
 
-  // Test: fashion category returns STYLE15
-  it("returns fashion coupon for fashion category in demo mode", async () => {
+  // Test: fashion category returns multiple coupons
+  it("returns fashion coupons for fashion category in demo mode", async () => {
     const results = await searchCoupons({
       merchant: "Zara",
       category: "fashion",
     });
 
-    expect(results.length).toBe(1);
+    expect(results.length).toBe(2);
     expect(results[0]).toEqual(
       expect.objectContaining({
         code: "STYLE15",
@@ -123,5 +123,27 @@ describe("coupon-provider", () => {
         source: "FashionSaver",
       })
     );
+    expect(results[1]).toEqual(
+      expect.objectContaining({
+        code: "TREND5",
+        discount: "$5 off",
+        type: "fixed",
+        source: "DealFinder",
+      })
+    );
+  });
+
+  // Test: electronics category returns 3 coupons including price_match
+  it("returns 3 coupons for electronics including price_match type", async () => {
+    const results = await searchCoupons({
+      merchant: "BestBuy",
+      category: "electronics",
+    });
+
+    expect(results.length).toBe(3);
+    const types = results.map((r) => r.type);
+    expect(types).toContain("percentage");
+    expect(types).toContain("fixed");
+    expect(types).toContain("price_match");
   });
 });
