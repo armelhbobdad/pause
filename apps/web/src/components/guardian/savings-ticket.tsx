@@ -3,6 +3,10 @@ import type { BestOffer } from "@/lib/guardian/types";
 export interface SavingsTicketProps {
   bestOffer: BestOffer | null;
   className?: string;
+  onApply?: (bestOffer: BestOffer) => Promise<void>;
+  isApplied?: boolean;
+  isApplying?: boolean;
+  disabled?: boolean;
 }
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -45,7 +49,14 @@ function buildAriaLabel(bestOffer: BestOffer): string {
   return `Savings found: ${amount} with code ${bestOffer.code}`;
 }
 
-export function SavingsTicket({ bestOffer, className }: SavingsTicketProps) {
+export function SavingsTicket({
+  bestOffer,
+  className,
+  onApply,
+  isApplied,
+  isApplying,
+  disabled,
+}: SavingsTicketProps) {
   if (!bestOffer) {
     return null;
   }
@@ -115,6 +126,72 @@ export function SavingsTicket({ bestOffer, className }: SavingsTicketProps) {
           </span>
         )}
       </div>
+
+      {onApply && !isApplied && (
+        <button
+          aria-label="Apply coupon and unlock card"
+          disabled={isApplying || disabled}
+          onClick={() => onApply(bestOffer)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            width: "100%",
+            minHeight: "44px",
+            marginTop: "0.75rem",
+            padding: "0.625rem 1rem",
+            border: "none",
+            borderRadius: "0.375rem",
+            backgroundColor: "var(--savings-gold)",
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "0.875rem",
+            cursor: isApplying || disabled ? "not-allowed" : "pointer",
+            opacity: isApplying || disabled ? 0.6 : 1,
+          }}
+          type="button"
+        >
+          {isApplying ? (
+            <>
+              <span
+                aria-hidden="true"
+                style={{
+                  display: "inline-block",
+                  width: "1rem",
+                  height: "1rem",
+                  border: "2px solid white",
+                  borderTopColor: "transparent",
+                  borderRadius: "50%",
+                  animation: "spin 0.6s linear infinite",
+                }}
+              />
+              Applying…
+            </>
+          ) : (
+            "Apply & Unlock"
+          )}
+        </button>
+      )}
+
+      {isApplied && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.375rem",
+            width: "100%",
+            marginTop: "0.75rem",
+            padding: "0.625rem 1rem",
+            color: "var(--savings-gold)",
+            fontWeight: "bold",
+            fontSize: "0.875rem",
+          }}
+        >
+          Applied ✓
+        </div>
+      )}
     </output>
   );
 }

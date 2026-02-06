@@ -49,6 +49,8 @@ export type RevealType = "earned" | "override" | "break_glass";
  */
 export type InteractionOutcome =
   | "accepted"
+  | "accepted_savings"
+  | "skipped_savings"
   | "override"
   | "wait"
   | "abandoned"

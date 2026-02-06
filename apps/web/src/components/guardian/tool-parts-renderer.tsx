@@ -1,4 +1,8 @@
+"use client";
+
 import type { DynamicToolUIPart } from "ai";
+import { useState } from "react";
+import { toast } from "sonner";
 import { SavingsTicket } from "@/components/guardian/savings-ticket";
 import type { ToolName } from "@/lib/guardian/tool-names";
 import { TOOL_NAMES } from "@/lib/guardian/tool-names";
@@ -25,14 +29,106 @@ export function isBestOffer(value: unknown): value is BestOffer {
 }
 
 // ============================================================================
+// SavingsTicketContainer — stateful wrapper (keeps ToolPartsRenderer pure)
+// ============================================================================
+
+interface SavingsTicketContainerProps {
+  bestOffer: BestOffer;
+  interactionId?: string | null;
+  onRevealApproved?: () => void;
+}
+
+function SavingsTicketContainer({
+  bestOffer,
+  interactionId,
+  onRevealApproved,
+}: SavingsTicketContainerProps) {
+  const [isApplied, setIsApplied] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+
+  const handleApply = async (offer: BestOffer) => {
+    if (!interactionId) {
+      return;
+    }
+    setIsApplying(true);
+
+    // Step 1: Clipboard copy (skip for price_match)
+    let clipboardOk = false;
+    if (offer.type !== "price_match") {
+      try {
+        await navigator.clipboard.writeText(offer.code);
+        clipboardOk = true;
+      } catch {
+        clipboardOk = false;
+      }
+    }
+
+    // Step 2: POST to apply-savings
+    try {
+      const response = await fetch("/api/ai/guardian/apply-savings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          interactionId,
+          couponCode: offer.type === "price_match" ? undefined : offer.code,
+          amountCents: offer.discountCents,
+          source: offer.source,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("API call failed");
+      }
+
+      // Step 3: Toast based on clipboard result
+      if (offer.type === "price_match") {
+        toast.success("Price match applied! Card unlocked.", {
+          duration: 3000,
+        });
+      } else if (clipboardOk) {
+        toast.success("Code copied! Card unlocked.", { duration: 3000 });
+      } else {
+        toast.success(`Card unlocked! Copy code manually: ${offer.code}`, {
+          duration: 6000,
+        });
+      }
+
+      // Step 4: Update state and reveal card
+      setIsApplying(false);
+      setIsApplied(true);
+      onRevealApproved?.();
+    } catch {
+      toast.error("Failed to apply savings. Try again.", { duration: 4000 });
+      setIsApplying(false);
+    }
+  };
+
+  return (
+    <SavingsTicket
+      bestOffer={bestOffer}
+      disabled={!interactionId}
+      isApplied={isApplied}
+      isApplying={isApplying}
+      onApply={handleApply}
+    />
+  );
+}
+
+// ============================================================================
 // ToolPartsRenderer
 // ============================================================================
 
 export interface ToolPartsRendererProps {
   part: DynamicToolUIPart;
+  interactionId?: string | null;
+  onRevealApproved?: () => void;
 }
 
-export function ToolPartsRenderer({ part }: ToolPartsRendererProps) {
+export function ToolPartsRenderer({
+  part,
+  interactionId,
+  onRevealApproved,
+}: ToolPartsRendererProps) {
   const toolName = part.toolName as ToolName;
 
   // Terminal error states: tool failed or was denied
@@ -75,7 +171,13 @@ export function ToolPartsRenderer({ part }: ToolPartsRendererProps) {
           </div>
         );
       }
-      return <SavingsTicket bestOffer={part.output} />;
+      return (
+        <SavingsTicketContainer
+          bestOffer={part.output}
+          interactionId={interactionId}
+          onRevealApproved={onRevealApproved}
+        />
+      );
     }
     case TOOL_NAMES.PRESENT_REFLECTION:
       return (

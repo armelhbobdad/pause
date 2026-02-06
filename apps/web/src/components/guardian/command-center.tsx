@@ -120,6 +120,7 @@ function CommandCenterInner({
   const autoApprovedRef = useRef(false);
   const breakGlassRef = useRef(false);
   const degradedRef = useRef(false);
+  const interactionIdRef = useRef<string | null>(null);
 
   // --- useChat integration (Story 3.1, AC#18) ---
   // React Compiler memoizes the transport instance based on cardId stability.
@@ -136,6 +137,7 @@ function CommandCenterInner({
           response.headers.get("x-guardian-break-glass") === "true";
         degradedRef.current =
           response.headers.get("x-guardian-degraded") === "true";
+        interactionIdRef.current = response.headers.get("x-interaction-id");
         return response;
       },
     }),
@@ -246,8 +248,10 @@ function CommandCenterInner({
   ) : (
     <MessageRenderer
       guardianContent={guardianContent}
+      interactionId={interactionIdRef.current}
       isStreaming={isStreaming}
       messages={messages}
+      onRevealApproved={revealApproved}
     />
   );
 

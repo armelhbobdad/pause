@@ -1,8 +1,12 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import type { BestOffer } from "@/lib/guardian/types";
 import { SavingsTicket } from "./savings-ticket";
 
+const APPLY_UNLOCK_PATTERN = /Apply & Unlock/;
+const APPLIED_PATTERN = /Applied ✓/;
+const APPLYING_PATTERN = /Applying…/;
 const CODE_SAVE35_PATTERN = /Code: SAVE35/;
 const VIA_TECHDEALS_PATTERN = /via TechDeals/;
 const PRICE_MATCH_FOUND_PATTERN = /Price match found/;
@@ -131,5 +135,87 @@ describe("SavingsTicket", () => {
     const ticket = screen.getByRole("status");
     expect(ticket.className).toContain("savings-ticket");
     expect(ticket.className).toContain("custom-class");
+  });
+});
+
+// ============================================================================
+// Action Button Tests (Story 4.5)
+// ============================================================================
+
+describe("SavingsTicket — action buttons", () => {
+  it("renders Apply & Unlock button when onApply is provided", () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    render(<SavingsTicket bestOffer={makeBestOffer()} onApply={onApply} />);
+
+    expect(screen.getByText(APPLY_UNLOCK_PATTERN)).toBeInTheDocument();
+  });
+
+  it("button is disabled and shows spinner when isApplying=true", () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    render(
+      <SavingsTicket
+        bestOffer={makeBestOffer()}
+        isApplying={true}
+        onApply={onApply}
+      />
+    );
+
+    const button = screen.getByRole("button");
+    expect(button).toBeDisabled();
+    expect(screen.getByText(APPLYING_PATTERN)).toBeInTheDocument();
+  });
+
+  it("button is disabled when disabled=true", () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    render(
+      <SavingsTicket
+        bestOffer={makeBestOffer()}
+        disabled={true}
+        onApply={onApply}
+      />
+    );
+
+    expect(screen.getByRole("button")).toBeDisabled();
+  });
+
+  it("shows Applied ✓ indicator when isApplied=true", () => {
+    render(
+      <SavingsTicket
+        bestOffer={makeBestOffer()}
+        isApplied={true}
+        onApply={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(APPLIED_PATTERN)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("calls onApply with bestOffer when button is clicked", async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    const offer = makeBestOffer();
+    render(<SavingsTicket bestOffer={offer} onApply={onApply} />);
+
+    await user.click(screen.getByRole("button"));
+
+    expect(onApply).toHaveBeenCalledWith(offer);
+  });
+
+  it("button has correct aria-label", () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    render(<SavingsTicket bestOffer={makeBestOffer()} onApply={onApply} />);
+
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "aria-label",
+      "Apply coupon and unlock card"
+    );
+  });
+
+  it("does not render action button when onApply is not provided", () => {
+    render(<SavingsTicket bestOffer={makeBestOffer()} />);
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByText(APPLY_UNLOCK_PATTERN)).not.toBeInTheDocument();
   });
 });

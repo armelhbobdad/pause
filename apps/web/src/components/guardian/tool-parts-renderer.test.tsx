@@ -1,8 +1,18 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { DynamicToolUIPart, UIMessage } from "ai";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MessageRenderer } from "./message-renderer";
 import { isBestOffer, ToolPartsRenderer } from "./tool-parts-renderer";
+
+// ============================================================================
+// Hoisted mocks
+// ============================================================================
+
+const mocks = vi.hoisted(() => ({
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+}));
 
 // ============================================================================
 // Mocks
@@ -11,6 +21,10 @@ import { isBestOffer, ToolPartsRenderer } from "./tool-parts-renderer";
 vi.mock("@/components/guardian/savings-ticket", () => ({
   SavingsTicket: ({
     bestOffer,
+    onApply,
+    isApplied,
+    isApplying,
+    disabled,
   }: {
     bestOffer: {
       code: string;
@@ -18,9 +32,27 @@ vi.mock("@/components/guardian/savings-ticket", () => ({
       discountCents: number;
       source: string;
     };
+    onApply?: (offer: unknown) => Promise<void>;
+    isApplied?: boolean;
+    isApplying?: boolean;
+    disabled?: boolean;
   }) => (
-    <div data-testid="savings-ticket">
+    <div
+      data-disabled={disabled}
+      data-is-applied={isApplied}
+      data-is-applying={isApplying}
+      data-testid="savings-ticket"
+    >
       SavingsTicket:{bestOffer.code}:{bestOffer.source}
+      {onApply && (
+        <button
+          data-testid="apply-button"
+          onClick={() => onApply(bestOffer)}
+          type="button"
+        >
+          Apply
+        </button>
+      )}
     </div>
   ),
 }));
@@ -37,6 +69,13 @@ vi.mock("streamdown", () => ({
       {children}
     </div>
   ),
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: mocks.toastSuccess,
+    error: mocks.toastError,
+  },
 }));
 
 // ============================================================================
@@ -67,23 +106,33 @@ function makeMessage(
   };
 }
 
+function makeValidOffer(overrides: Record<string, unknown> = {}) {
+  return {
+    code: "SAVE20",
+    discount: "20% OFF",
+    discountCents: 2000,
+    type: "percentage",
+    source: "TestStore",
+    expiresAt: null,
+    selectionReasoning: "Best deal",
+    ...overrides,
+  };
+}
+
 // ============================================================================
 // ToolPartsRenderer — AC#1: Exhaustive switch
 // ============================================================================
 
 describe("ToolPartsRenderer", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
   it("renders SavingsTicket for search_coupons tool result", () => {
     const part = makeToolPart({
       toolName: "search_coupons",
-      output: {
-        code: "SAVE20",
-        discount: "20% OFF",
-        discountCents: 2000,
-        type: "percentage",
-        source: "TestStore",
-        expiresAt: null,
-        selectionReasoning: "Best deal",
-      },
+      output: makeValidOffer(),
     });
 
     render(<ToolPartsRenderer part={part} />);
@@ -138,15 +187,7 @@ describe("ToolPartsRenderer", () => {
 
     const resultPart = makeToolPart({
       toolName: "search_coupons",
-      output: {
-        code: "SAVE10",
-        discount: "10% OFF",
-        discountCents: 1000,
-        type: "percentage",
-        source: "Store",
-        expiresAt: null,
-        selectionReasoning: "Good deal",
-      },
+      output: makeValidOffer({ code: "SAVE10", source: "Store" }),
     });
 
     rerender(<ToolPartsRenderer part={resultPart} />);
@@ -219,6 +260,259 @@ describe("ToolPartsRenderer", () => {
 
     render(<ToolPartsRenderer part={part} />);
     expect(screen.getByText("Savings data unavailable")).toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// SavingsTicketContainer — Story 4.5
+// ============================================================================
+
+describe("SavingsTicketContainer (via ToolPartsRenderer)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it("renders SavingsTicket with disabled=true when interactionId is null", () => {
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId={null}
+        onRevealApproved={vi.fn()}
+        part={part}
+      />
+    );
+
+    const ticket = screen.getByTestId("savings-ticket");
+    expect(ticket).toHaveAttribute("data-disabled", "true");
+  });
+
+  it("renders SavingsTicket with disabled=false when interactionId is present", () => {
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={vi.fn()}
+        part={part}
+      />
+    );
+
+    const ticket = screen.getByTestId("savings-ticket");
+    expect(ticket).toHaveAttribute("data-disabled", "false");
+  });
+
+  it("handleApply calls clipboard API and posts to apply-savings endpoint", async () => {
+    const user = userEvent.setup();
+    const mockReveal = vi.fn();
+    const clipboardWriteText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: clipboardWriteText },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={mockReveal}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("apply-button"));
+
+    await waitFor(() => {
+      expect(clipboardWriteText).toHaveBeenCalledWith("SAVE20");
+    });
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/apply-savings",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+  });
+
+  it("handleApply calls revealApproved on success", async () => {
+    const user = userEvent.setup();
+    const mockReveal = vi.fn();
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={mockReveal}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("apply-button"));
+
+    await waitFor(() => {
+      expect(mockReveal).toHaveBeenCalled();
+    });
+
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Code copied! Card unlocked.",
+      expect.objectContaining({ duration: 3000 })
+    );
+  });
+
+  it("handleApply shows error toast on API failure and does NOT call revealApproved", async () => {
+    const user = userEvent.setup();
+    const mockReveal = vi.fn();
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "fail" }), { status: 500 })
+    );
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={mockReveal}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("apply-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Failed to apply savings. Try again.",
+        expect.objectContaining({ duration: 4000 })
+      );
+    });
+
+    // AC#6: Button re-enables after failure
+    await waitFor(() => {
+      expect(screen.getByTestId("savings-ticket")).toHaveAttribute(
+        "data-is-applying",
+        "false"
+      );
+    });
+
+    expect(mockReveal).not.toHaveBeenCalled();
+  });
+
+  it("handleApply with clipboard failure still calls API and revealApproved, shows manual copy toast", async () => {
+    const user = userEvent.setup();
+    const mockReveal = vi.fn();
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: vi.fn().mockRejectedValue(new Error("Clipboard denied")),
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer(),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={mockReveal}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("apply-button"));
+
+    await waitFor(() => {
+      expect(mockReveal).toHaveBeenCalled();
+    });
+
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Card unlocked! Copy code manually: SAVE20",
+      expect.objectContaining({ duration: 6000 })
+    );
+  });
+
+  it("handleApply with price_match skips clipboard and shows price match toast", async () => {
+    const user = userEvent.setup();
+    const mockReveal = vi.fn();
+    const clipboardWriteText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: clipboardWriteText },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "search_coupons",
+      output: makeValidOffer({ type: "price_match" }),
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={mockReveal}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("apply-button"));
+
+    await waitFor(() => {
+      expect(mockReveal).toHaveBeenCalled();
+    });
+
+    // Clipboard should NOT have been called for price_match
+    expect(clipboardWriteText).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Price match applied! Card unlocked.",
+      expect.objectContaining({ duration: 3000 })
+    );
   });
 });
 
@@ -302,15 +596,7 @@ describe("MessageRenderer", () => {
         makeToolPart({
           toolName: "search_coupons",
           toolCallId: "tool-1",
-          output: {
-            code: "MIX20",
-            discount: "20%",
-            discountCents: 2000,
-            type: "percentage",
-            source: "Store",
-            expiresAt: null,
-            selectionReasoning: "Deal",
-          },
+          output: makeValidOffer({ code: "MIX20", source: "Store" }),
         }),
       ]),
     ];
@@ -337,15 +623,7 @@ describe("MessageRenderer", () => {
         makeToolPart({
           toolName: "search_coupons",
           toolCallId: "tool-breath",
-          output: {
-            code: "BB10",
-            discount: "10%",
-            discountCents: 1000,
-            type: "percentage",
-            source: "Store",
-            expiresAt: null,
-            selectionReasoning: "Deal",
-          },
+          output: makeValidOffer({ code: "BB10", source: "Store" }),
         }),
       ]),
     ];

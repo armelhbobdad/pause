@@ -12,12 +12,16 @@ export interface MessageRendererProps {
   messages: UIMessage[];
   isStreaming: boolean;
   guardianContent?: ReactNode;
+  interactionId?: string | null;
+  onRevealApproved?: () => void;
 }
 
 export function MessageRenderer({
   messages,
   isStreaming,
   guardianContent,
+  interactionId,
+  onRevealApproved,
 }: MessageRendererProps) {
   const assistantMessages = messages.filter((m) => m.role === "assistant");
 
@@ -53,7 +57,11 @@ export function MessageRenderer({
                     animation: "breath-beat-enter 300ms ease-out 200ms both",
                   }}
                 >
-                  <ToolPartsRenderer part={dynamicPart} />
+                  <ToolPartsRenderer
+                    interactionId={interactionId}
+                    onRevealApproved={onRevealApproved}
+                    part={dynamicPart}
+                  />
                 </div>
               );
             }
