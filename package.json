@@ -34,6 +34,7 @@
     "db:seed:rookie": "bun run scripts/seed-rookie.ts",
     "db:seed:pro": "bun run scripts/seed-pro.ts",
     "test:smoke-trace": "bun run scripts/test-smoke-trace.ts",
+    "test": "vitest run",
     "check": "ultracite check",
     "fix": "ultracite fix",
     "knip": "knip",
@@ -51,11 +52,13 @@
     "@commitlint/config-conventional": "^20.4.0",
     "@pause/config": "workspace:*",
     "@types/node": "^22.13.14",
+    "happy-dom": "^20.5.0",
     "knip": "^5.82.1",
     "lefthook": "^2.0.16",
     "turbo": "^2.6.3",
     "typescript": "catalog:",
-    "ultracite": "7.1.3"
+    "ultracite": "7.1.3",
+    "vitest": "^4.0.18"
   },
   "packageManager": "bun@1.3.5"
 }
