@@ -316,6 +316,90 @@ describe("useGuardianState", () => {
   });
 
   // ==========================================================================
+  // Error Path: GUARDIAN_ERROR (Story 2.6)
+  // ==========================================================================
+
+  describe("error path: GUARDIAN_ERROR (Story 2.6)", () => {
+    it("transitions active → revealed with break_glass revealType on GUARDIAN_ERROR", () => {
+      const { result } = renderHook(() => useGuardianState());
+      act(() => result.current.requestUnlock());
+      act(() => result.current.onExpansionComplete());
+      act(() => result.current.guardianError());
+      expect(result.current.state).toBe("revealed");
+      expect(result.current.isRevealed).toBe(true);
+      expect(result.current.revealType).toBe("break_glass");
+    });
+
+    it("transitions expanding → revealed with break_glass revealType on GUARDIAN_ERROR", () => {
+      const { result } = renderHook(() => useGuardianState());
+      act(() => result.current.requestUnlock());
+      expect(result.current.state).toBe("expanding");
+      act(() => result.current.guardianError());
+      expect(result.current.state).toBe("revealed");
+      expect(result.current.isRevealed).toBe(true);
+      expect(result.current.revealType).toBe("break_glass");
+    });
+
+    it("ignores GUARDIAN_ERROR from idle state (state guard)", () => {
+      const { result } = renderHook(() => useGuardianState());
+      expect(result.current.state).toBe("idle");
+      act(() => result.current.guardianError());
+      expect(result.current.state).toBe("idle");
+      expect(result.current.revealType).toBeNull();
+    });
+
+    it("RELOCK from break_glass revealed returns to idle", () => {
+      const { result } = renderHook(() => useGuardianState());
+      act(() => result.current.requestUnlock());
+      act(() => result.current.onExpansionComplete());
+      act(() => result.current.guardianError());
+      expect(result.current.state).toBe("revealed");
+      expect(result.current.revealType).toBe("break_glass");
+
+      act(() => result.current.relock());
+      expect(result.current.state).toBe("idle");
+      expect(result.current.revealType).toBeNull();
+    });
+
+    it("clears timeout when GUARDIAN_ERROR fires from active state", () => {
+      const onTimeout = vi.fn();
+      const { result } = renderHook(() => useGuardianState({ onTimeout }));
+      act(() => result.current.requestUnlock());
+      act(() => result.current.onExpansionComplete());
+      expect(result.current.state).toBe("active");
+
+      act(() => result.current.guardianError());
+
+      // Timeout should have been cleared — advancing time should not fire it
+      act(() => vi.advanceTimersByTime(10_000));
+      expect(onTimeout).not.toHaveBeenCalled();
+    });
+
+    it("ignores GUARDIAN_ERROR from collapsing state", () => {
+      const { result } = renderHook(() => useGuardianState());
+      act(() => result.current.requestUnlock());
+      act(() => result.current.onExpansionComplete());
+      act(() => result.current.onResponseReceived());
+      expect(result.current.state).toBe("collapsing");
+
+      act(() => result.current.dispatch({ type: "GUARDIAN_ERROR" }));
+      expect(result.current.state).toBe("collapsing");
+    });
+
+    it("ignores GUARDIAN_ERROR from revealed state", () => {
+      const { result } = renderHook(() => useGuardianState());
+      act(() => result.current.requestUnlock());
+      act(() => result.current.onExpansionComplete());
+      act(() => result.current.revealApproved());
+      expect(result.current.state).toBe("revealed");
+
+      act(() => result.current.dispatch({ type: "GUARDIAN_ERROR" }));
+      expect(result.current.state).toBe("revealed");
+      expect(result.current.revealType).toBe("earned");
+    });
+  });
+
+  // ==========================================================================
   // Full Cycle (round-trip)
   // ==========================================================================
 
@@ -336,6 +420,17 @@ describe("useGuardianState", () => {
       act(() => result.current.revealOverride());
       act(() => result.current.relock());
       expect(result.current.state).toBe("idle");
+    });
+
+    it("can complete break glass cycle: unlock → error → relock", () => {
+      const { result } = renderHook(() => useGuardianState());
+      act(() => result.current.requestUnlock());
+      act(() => result.current.onExpansionComplete());
+      act(() => result.current.guardianError());
+      expect(result.current.revealType).toBe("break_glass");
+      act(() => result.current.relock());
+      expect(result.current.state).toBe("idle");
+      expect(result.current.revealType).toBeNull();
     });
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useRef } from "react";
+import type { RevealType } from "@/lib/guardian/types";
 
 // ============================================================================
 // Constants
@@ -32,12 +33,8 @@ export type GuardianState =
   | "collapsing"
   | "revealed";
 
-/**
- * Type of reveal animation - determines CSS animation timing
- * - earned: Guardian approved unlock (500-700ms ease-out-expo, warm snap)
- * - override: User bypassed Guardian (300-400ms linear, mechanical)
- */
-export type RevealType = "earned" | "override";
+// RevealType imported from @/lib/guardian/types (canonical definition)
+export type { RevealType } from "@/lib/guardian/types";
 
 /**
  * Actions that trigger state transitions
@@ -50,6 +47,7 @@ export type GuardianAction =
   | { type: "TIMEOUT" }
   | { type: "REVEAL_APPROVED" } // Guardian approved unlock (Story 2.3)
   | { type: "REVEAL_OVERRIDE" } // User bypassed Guardian (Story 2.3)
+  | { type: "GUARDIAN_ERROR" } // Error occurred — break glass reveal (Story 2.6)
   | { type: "RELOCK" }; // Countdown expired or manual relock (Story 2.3)
 
 export interface UseGuardianStateOptions {
@@ -68,7 +66,7 @@ export interface UseGuardianStateReturn {
   isIdle: boolean;
   /** Whether card details are revealed */
   isRevealed: boolean;
-  /** Type of reveal animation ("earned" or "override"), null if not revealed */
+  /** Type of reveal animation ("earned", "override", or "break_glass"), null if not revealed */
   revealType: RevealType | null;
   /** Request an unlock - transitions from idle to expanding */
   requestUnlock: () => void;
@@ -82,6 +80,8 @@ export interface UseGuardianStateReturn {
   revealApproved: () => void;
   /** Signal that user overrode Guardian - transitions to revealed with faster animation (Story 2.3) */
   revealOverride: () => void;
+  /** Signal Guardian error — break glass reveal from expanding or active (Story 2.6) */
+  guardianError: () => void;
   /** Signal that countdown expired or manual relock - transitions from revealed to idle (Story 2.3) */
   relock: () => void;
   /** Dispatch any action directly (for advanced use cases) */
@@ -101,58 +101,51 @@ interface GuardianInternalState {
 }
 
 /**
- * Guardian state machine reducer following Architecture guidelines.
+ * State transition map — declarative definition of all valid transitions.
+ * Maps (currentState, action) → newState or undefined (no transition).
+ *
  * Transitions:
  * - idle → expanding (user taps card via REQUEST_UNLOCK)
  * - expanding → active (CSS transitionend fires via EXPANSION_COMPLETE)
+ * - expanding → revealed/break_glass (GUARDIAN_ERROR, Story 2.6)
  * - active → collapsing (response received or timeout via RESPONSE_RECEIVED/TIMEOUT)
  * - active → revealed (Guardian approved via REVEAL_APPROVED)
  * - active → revealed (User override via REVEAL_OVERRIDE)
+ * - active → revealed/break_glass (GUARDIAN_ERROR, Story 2.6)
  * - collapsing → idle (animation completes via COLLAPSE_COMPLETE)
  * - revealed → idle (countdown expired or manual relock via RELOCK)
  */
+const TRANSITIONS: Record<
+  GuardianState,
+  Partial<Record<GuardianAction["type"], GuardianInternalState>>
+> = {
+  idle: {
+    REQUEST_UNLOCK: { status: "expanding", revealType: null },
+  },
+  expanding: {
+    EXPANSION_COMPLETE: { status: "active", revealType: null },
+    GUARDIAN_ERROR: { status: "revealed", revealType: "break_glass" },
+  },
+  active: {
+    RESPONSE_RECEIVED: { status: "collapsing", revealType: null },
+    TIMEOUT: { status: "collapsing", revealType: null },
+    REVEAL_APPROVED: { status: "revealed", revealType: "earned" },
+    REVEAL_OVERRIDE: { status: "revealed", revealType: "override" },
+    GUARDIAN_ERROR: { status: "revealed", revealType: "break_glass" },
+  },
+  collapsing: {
+    COLLAPSE_COMPLETE: { status: "idle", revealType: null },
+  },
+  revealed: {
+    RELOCK: { status: "idle", revealType: null },
+  },
+};
+
 function guardianReducer(
   state: GuardianInternalState,
   action: GuardianAction
 ): GuardianInternalState {
-  switch (state.status) {
-    case "idle":
-      if (action.type === "REQUEST_UNLOCK") {
-        return { status: "expanding", revealType: null };
-      }
-      return state;
-    case "expanding":
-      if (action.type === "EXPANSION_COMPLETE") {
-        return { status: "active", revealType: null };
-      }
-      return state;
-    case "active":
-      if (action.type === "RESPONSE_RECEIVED") {
-        return { status: "collapsing", revealType: null };
-      }
-      if (action.type === "TIMEOUT") {
-        return { status: "collapsing", revealType: null };
-      }
-      if (action.type === "REVEAL_APPROVED") {
-        return { status: "revealed", revealType: "earned" };
-      }
-      if (action.type === "REVEAL_OVERRIDE") {
-        return { status: "revealed", revealType: "override" };
-      }
-      return state;
-    case "collapsing":
-      if (action.type === "COLLAPSE_COMPLETE") {
-        return { status: "idle", revealType: null };
-      }
-      return state;
-    case "revealed":
-      if (action.type === "RELOCK") {
-        return { status: "idle", revealType: null };
-      }
-      return state;
-    default:
-      return state;
-  }
+  return TRANSITIONS[state.status][action.type] ?? state;
 }
 
 // ============================================================================
@@ -290,6 +283,18 @@ export function useGuardianState(
     dispatch({ type: "REVEAL_OVERRIDE" });
   }
 
+  function guardianError() {
+    // Only process from expanding or active states (state guard)
+    if (state !== "expanding" && state !== "active") {
+      return;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    dispatch({ type: "GUARDIAN_ERROR" });
+  }
+
   function relock() {
     // Only process if in revealed state
     if (state !== "revealed") {
@@ -310,6 +315,7 @@ export function useGuardianState(
     onCollapseComplete,
     revealApproved,
     revealOverride,
+    guardianError,
     relock,
     dispatch,
   };

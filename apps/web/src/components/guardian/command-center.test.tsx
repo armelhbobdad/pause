@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CardData } from "./card-vault";
 import { CommandCenter } from "./command-center";
 
@@ -20,6 +20,57 @@ vi.mock("@/components/ui/skeleton", () => ({
 vi.mock("@/lib/utils", () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
 }));
+
+// Mock Button for GuardianErrorFallback rendering in break glass tests
+vi.mock("@/components/ui/button", () => ({
+  Button: ({
+    children,
+    onClick,
+    size,
+    variant,
+  }: {
+    children?: string;
+    onClick?: () => void;
+    size?: string;
+    variant?: string;
+  }) => (
+    <button
+      data-size={size}
+      data-variant={variant}
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
+  ),
+}));
+
+// Configurable mock for break glass tests (Story 2.6).
+// When value is null, the real useGuardianState runs normally.
+// Set to a mock return value to simulate break glass state.
+const guardianStateOverride = vi.hoisted(() => ({
+  value: null as Record<string, unknown> | null,
+}));
+
+vi.mock("@/hooks/use-guardian-state", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/hooks/use-guardian-state")>();
+  return {
+    ...actual,
+    useGuardianState: (options?: unknown) => {
+      if (guardianStateOverride.value) {
+        return guardianStateOverride.value;
+      }
+      // biome-ignore lint/correctness/useHookAtTopLevel: This is a test mock wrapper, not a real React hook. The conditional controls whether the real hook runs or a mock return value is used.
+      return actual.useGuardianState(
+        options as Parameters<typeof actual.useGuardianState>[0]
+      );
+    },
+  };
+});
+
+const DISMISS_REGEX = /dismiss/i;
+const MANUAL_UNLOCK_REGEX = /manual unlock/i;
 
 const mockCard: CardData = {
   id: "card-1",
@@ -153,6 +204,72 @@ describe("CommandCenter", () => {
       expect(conversation.dataset.active).toBeDefined();
       const section = container.querySelector("section");
       expect(section?.hasAttribute("inert")).toBe(true);
+    });
+  });
+
+  // ==========================================================================
+  // Break Glass Error Fallback (Story 2.6)
+  // ==========================================================================
+
+  describe("break glass error fallback (Story 2.6)", () => {
+    const mockRelock = vi.fn();
+
+    beforeEach(() => {
+      mockRelock.mockClear();
+      guardianStateOverride.value = {
+        state: "revealed",
+        isActive: false,
+        isIdle: false,
+        isRevealed: true,
+        revealType: "break_glass",
+        requestUnlock: vi.fn(),
+        onExpansionComplete: vi.fn(),
+        onResponseReceived: vi.fn(),
+        onCollapseComplete: vi.fn(),
+        revealApproved: vi.fn(),
+        revealOverride: vi.fn(),
+        guardianError: vi.fn(),
+        relock: mockRelock,
+        dispatch: vi.fn(),
+      };
+    });
+
+    afterEach(() => {
+      guardianStateOverride.value = null;
+    });
+
+    it("shows error fallback when in break glass state", () => {
+      render(<CommandCenter card={mockCard} />);
+      expect(
+        screen.getByText("Guardian unavailable. You can unlock manually.")
+      ).toBeInTheDocument();
+    });
+
+    it("keeps conversation area expanded during break glass", () => {
+      const { container } = render(<CommandCenter card={mockCard} />);
+      const conversation = container.querySelector(
+        "[data-tier]"
+      ) as HTMLElement;
+      expect(conversation.style.gridTemplateRows).toBe("1fr");
+    });
+
+    it("Dismiss button calls relock to return to idle", async () => {
+      const user = userEvent.setup();
+      render(<CommandCenter card={mockCard} />);
+      await user.click(screen.getByRole("button", { name: DISMISS_REGEX }));
+      expect(mockRelock).toHaveBeenCalledOnce();
+    });
+
+    it("Manual Unlock dismisses fallback without relocking", async () => {
+      const user = userEvent.setup();
+      render(<CommandCenter card={mockCard} />);
+      await user.click(
+        screen.getByRole("button", { name: MANUAL_UNLOCK_REGEX })
+      );
+      expect(mockRelock).not.toHaveBeenCalled();
+      expect(
+        screen.queryByText("Guardian unavailable. You can unlock manually.")
+      ).not.toBeInTheDocument();
     });
   });
 });

@@ -3,6 +3,7 @@
 import type { KeyboardEvent } from "react";
 import { CountdownTimer } from "@/components/guardian/countdown-timer";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { RevealType } from "@/lib/guardian/types";
 import { cn } from "@/lib/utils";
 
 // ============================================================================
@@ -26,8 +27,8 @@ export interface CardData {
   updatedAt: Date;
 }
 
-/** Type of reveal animation to use */
-export type RevealType = "earned" | "override" | null;
+// RevealType imported from @/lib/guardian/types (canonical definition)
+export type { RevealType } from "@/lib/guardian/types";
 
 export interface CardVaultProps {
   card: CardData | null;
@@ -38,7 +39,7 @@ export interface CardVaultProps {
   /** When true, card details are revealed (frost overlay fades out) */
   isRevealed?: boolean;
   /** Type of reveal determines animation timing: "earned" (warm snap) or "override" (mechanical) */
-  revealType?: RevealType;
+  revealType?: RevealType | null;
   /** When true, shows countdown timer at card bottom after reveal */
   showCountdown?: boolean;
   /** Countdown duration in milliseconds (default: 60000ms per executive function window) */
@@ -210,6 +211,10 @@ export function CardVault({
     <div
       aria-busy={isActive && !isRevealed}
       aria-label={ariaLabel}
+      // TODO(Story 2.6 AC#2): Pulse animation currently stops abruptly when isActive
+      // becomes false. --duration-pulse-fade (300ms) token exists in tokens.css but
+      // requires a CSS transition on an opacity wrapper to fade the keyframe animation
+      // gracefully. CSS animations cannot be smoothly stopped via transitions alone.
       className={cn(
         "relative mx-auto w-full max-w-[28rem] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isActive && "animate-guardian-pulse",
@@ -270,8 +275,9 @@ export function CardVault({
               opacity: "var(--frost-opacity)",
               // Apply transition based on reveal type
               // earned = 600ms ease-out-expo (warm snap), override = 350ms linear (mechanical)
+              // break_glass = matches override timing (immediate, no countdown)
               transition:
-                revealType === "override"
+                revealType === "override" || revealType === "break_glass"
                   ? "--frost-opacity var(--duration-reveal-override) linear"
                   : "--frost-opacity var(--duration-reveal) var(--ease-out-expo)",
               // Set frost-opacity based on revealed state
@@ -281,8 +287,9 @@ export function CardVault({
         />
 
         {/* Countdown timer appears at card bottom after reveal (UX-76)
-            Shows executive function window before auto-relock. */}
-        {isRevealed && showCountdown && (
+            Shows executive function window before auto-relock.
+            Break glass reveals skip timer — emergency unlock, not time-limited (Story 2.6 AC#2). */}
+        {isRevealed && showCountdown && revealType !== "break_glass" && (
           <CountdownTimer
             durationMs={countdownDuration}
             onExpire={onCountdownExpire}

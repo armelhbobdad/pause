@@ -7,6 +7,19 @@
  */
 
 // ============================================================================
+// Reveal Type
+// ============================================================================
+
+/**
+ * RevealType — determines the card reveal animation and behavior.
+ *
+ * - earned: Guardian approved unlock (600ms ease-out-expo, warm snap)
+ * - override: User bypassed Guardian (350ms linear, mechanical)
+ * - break_glass: Emergency unlock on error (350ms linear, no countdown timer)
+ */
+export type RevealType = "earned" | "override" | "break_glass";
+
+// ============================================================================
 // Interaction Outcome Types
 // ============================================================================
 
@@ -21,7 +34,12 @@
  *
  * @note Actual persistence happens in Epic 3/6 via POST to /api/ai/feedback
  */
-export type InteractionOutcome = "accepted" | "override" | "wait" | "abandoned";
+export type InteractionOutcome =
+  | "accepted"
+  | "override"
+  | "wait"
+  | "abandoned"
+  | "break_glass";
 
 /**
  * Callback type for outcome recording
