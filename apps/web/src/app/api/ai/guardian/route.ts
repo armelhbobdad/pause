@@ -12,7 +12,7 @@ import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import z from "zod";
-import { wrapSkillbookContext } from "@/lib/server/ace";
+import { loadUserSkillbook } from "@/lib/server/ace";
 import { ANALYST_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/analyst";
 import { NEGOTIATOR_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/negotiator";
 import { THERAPIST_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/therapist";
@@ -136,10 +136,17 @@ export async function POST(req: Request) {
     return new Response("Failed to create interaction record", { status: 500 });
   }
 
-  // --- Load Skillbook context (AC#13) ---
-  // TODO(Story 3.4): Query skillbook table and pass data to wrapSkillbookContext().
-  // Currently the stub always returns "" — DB query deferred to avoid wasted roundtrip.
-  const skillbookContext = wrapSkillbookContext();
+  // --- Load Skillbook context (Story 3.4) ---
+  let skillbookContext = "";
+  try {
+    skillbookContext = await loadUserSkillbook(session.user.id);
+  } catch (error) {
+    console.warn(
+      "[Guardian] Skillbook loading failed, continuing without context:",
+      error
+    );
+    serviceHealth.ace = false;
+  }
 
   // --- Build tier-aware system prompt (Story 3.3, AC#1, #2, #3, #4) ---
   const tierPrompt = TIER_PROMPTS[tier];

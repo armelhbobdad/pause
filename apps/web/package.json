@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@ai-sdk/devtools": "^0.0.2",
+    "@pause/ace": "workspace:*",
     "@ai-sdk/google": "^3.0.1",
     "@ai-sdk/react": "^3.0.3",
     "@base-ui/react": "^1.0.0",

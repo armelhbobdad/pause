@@ -16,6 +16,7 @@ export default defineConfig({
       ),
       "@pause/env/web": resolve(__dirname, "../../packages/env/src/web.ts"),
       "@pause/env": resolve(__dirname, "../../packages/env/src/index.ts"),
+      "@pause/ace": resolve(__dirname, "../../packages/ace/src/index.ts"),
     },
   },
   test: {
@@ -25,7 +26,7 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     server: {
       deps: {
-        inline: ["@pause/db", "@pause/auth", "@pause/env"],
+        inline: ["@pause/db", "@pause/auth", "@pause/env", "@pause/ace"],
       },
     },
   },

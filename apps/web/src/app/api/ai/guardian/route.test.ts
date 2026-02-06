@@ -127,7 +127,7 @@ vi.mock("@/lib/server/guardian/risk", () => ({
 }));
 
 vi.mock("@/lib/server/ace", () => ({
-  wrapSkillbookContext: vi.fn(() => ""),
+  loadUserSkillbook: vi.fn(async () => ""),
 }));
 
 vi.mock("@/lib/server/opik", () => ({
@@ -420,13 +420,55 @@ describe("Guardian Route Handler", () => {
   });
 
   // ========================================================================
-  // Skillbook loading (AC#13)
+  // Skillbook context injection (Story 3.4)
   // ========================================================================
 
-  describe("skillbook loading (AC#13)", () => {
-    it("proceeds with empty skillbook context (stub returns empty string)", async () => {
+  describe("skillbook context injection (Story 3.4)", () => {
+    it("proceeds with empty skillbook context", async () => {
       const response = await POST(createRequest(validBody));
-      // wrapSkillbookContext() stub returns "" — route should succeed
+      expect(response.status).toBe(200);
+    });
+
+    it("calls loadUserSkillbook with session.user.id", async () => {
+      const { loadUserSkillbook } = await import("@/lib/server/ace");
+      await POST(createRequest(validBody));
+      expect(loadUserSkillbook).toHaveBeenCalledWith("user-1");
+    });
+
+    it("injects skillbook context into system prompt when non-empty", async () => {
+      const { loadUserSkillbook } = await import("@/lib/server/ace");
+      vi.mocked(loadUserSkillbook).mockResolvedValueOnce(
+        "[learned strategies]"
+      );
+
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          system: expect.stringContaining("[learned strategies]"),
+        })
+      );
+    });
+
+    it("uses tier prompt only when skillbook context is empty", async () => {
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          system: "You are a test analyst prompt.",
+        })
+      );
+    });
+
+    it("continues streaming when loadUserSkillbook throws (graceful degradation)", async () => {
+      const { loadUserSkillbook } = await import("@/lib/server/ace");
+      vi.mocked(loadUserSkillbook).mockRejectedValueOnce(
+        new Error("ACE service down")
+      );
+
+      const response = await POST(createRequest(validBody));
       expect(response.status).toBe(200);
     });
   });
