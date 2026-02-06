@@ -35,9 +35,18 @@ export function getOpikClient(): Opik | null {
   return opikClient;
 }
 
-export function getGuardianTelemetry(interactionId: string): TelemetrySettings {
+export function getGuardianTelemetry(
+  interactionId: string,
+  riskMeta?: { score: number; reasoning: string }
+): TelemetrySettings {
   return {
     ...OpikExporter.getSettings({ name: `guardian-${interactionId}` }),
-    metadata: { interactionId },
+    metadata: {
+      interactionId,
+      ...(riskMeta && {
+        riskScore: riskMeta.score,
+        riskReasoning: riskMeta.reasoning,
+      }),
+    },
   };
 }

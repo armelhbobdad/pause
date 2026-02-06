@@ -110,6 +110,21 @@ vi.mock("@ai-sdk/google", () => ({
 }));
 
 // --- Mock server-side Guardian utilities ---
+vi.mock("@/lib/server/utils", () => ({
+  withTimeout: vi.fn(<T>(promise: Promise<T>, _ms: number) => promise),
+}));
+
+vi.mock("@/lib/server/guardian/risk", () => ({
+  assessRisk: vi.fn(() =>
+    Promise.resolve({
+      score: 10,
+      factors: [],
+      reasoning: "test",
+      historyAvailable: true,
+    })
+  ),
+}));
+
 vi.mock("@/lib/server/ace", () => ({
   wrapSkillbookContext: vi.fn(() => ""),
 }));
@@ -388,6 +403,44 @@ describe("Guardian Route Handler", () => {
       const response = await POST(createRequest(validBody));
       // wrapSkillbookContext() stub returns "" — route should succeed
       expect(response.status).toBe(200);
+    });
+  });
+
+  // ========================================================================
+  // Risk assessment integration (Story 3.2)
+  // ========================================================================
+
+  describe("risk assessment integration (Story 3.2)", () => {
+    it("includes riskScore in skeleton interaction write", async () => {
+      await POST(createRequest(validBody));
+      // The insert mock should have been called with riskScore from assessRisk mock (score: 10)
+      const insertCall = mocks.mockInsert.mock.results[0];
+      expect(insertCall).toBeDefined();
+      // Verify insert was called (values chain)
+      const insertReturn = mocks.mockInsert.mock.results[0]?.value;
+      expect(insertReturn?.values).toHaveBeenCalledWith(
+        expect.objectContaining({ riskScore: 10 })
+      );
+    });
+
+    it("calls assessRisk before skeleton write", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      await POST(createRequest(validBody));
+      expect(assessRisk).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          cardId: "card-123",
+        })
+      );
+    });
+
+    it("passes risk metadata to telemetry (AC#9)", async () => {
+      const { getGuardianTelemetry } = await import("@/lib/server/opik");
+      await POST(createRequest(validBody));
+      expect(getGuardianTelemetry).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ score: 10, reasoning: "test" })
+      );
     });
   });
 

@@ -9,7 +9,9 @@ import { after } from "next/server";
 import z from "zod";
 import { wrapSkillbookContext } from "@/lib/server/ace";
 import { ANALYST_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/analyst";
+import { assessRisk } from "@/lib/server/guardian/risk";
 import { getGuardianTelemetry } from "@/lib/server/opik";
+import { withTimeout } from "@/lib/server/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -27,16 +29,6 @@ const requestSchema = z.object({
   cardId: z.string().min(1),
   purchaseContext: z.string().max(500).optional(),
 });
-
-/** Race a promise against a timeout. Rejects if timeout fires first. */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("Operation timed out")), ms);
-    }),
-  ]);
-}
 
 export async function POST(req: Request) {
   // Service health tracking — scaffold for Story 3.6 degradation ladder.
@@ -81,6 +73,31 @@ export async function POST(req: Request) {
   // --- Generate interactionId (AC#7, ADR-007) ---
   const interactionId = crypto.randomUUID();
 
+  // --- Risk assessment (Story 3.2, AC#10) ---
+  let riskResult: {
+    score: number;
+    reasoning: string;
+    historyAvailable: boolean;
+  };
+  try {
+    riskResult = await assessRisk({
+      userId: session.user.id,
+      cardId,
+      purchaseContext,
+      // priceInCents and category are NOT parsed from purchaseContext in this story.
+      // Pass undefined — future story or 3.3 can add structured extraction.
+    });
+  } catch {
+    riskResult = {
+      score: 0,
+      reasoning: "Risk assessment unavailable",
+      historyAvailable: false,
+    };
+  }
+  if (!riskResult.historyAvailable) {
+    serviceHealth.neon = false;
+  }
+
   // --- Skeleton interaction write (AC#9, ADR-006) ---
   try {
     await withTimeout(
@@ -89,6 +106,7 @@ export async function POST(req: Request) {
         userId: session.user.id,
         cardId,
         tier: "analyst",
+        riskScore: riskResult.score,
         status: "pending",
       }),
       DB_TIMEOUT_MS
@@ -126,7 +144,10 @@ export async function POST(req: Request) {
       model: google("gemini-2.5-flash"),
       system: systemPrompt,
       messages: modelMessages,
-      experimental_telemetry: getGuardianTelemetry(interactionId),
+      experimental_telemetry: getGuardianTelemetry(interactionId, {
+        score: riskResult.score,
+        reasoning: riskResult.reasoning,
+      }),
       abortSignal: AbortSignal.timeout(10_000),
     });
 
