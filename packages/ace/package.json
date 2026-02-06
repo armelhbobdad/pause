@@ -1,0 +1,33 @@
+{
+  "name": "@pause/ace",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./integrations": "./src/integrations/base.ts",
+    "./skillbook": "./src/skillbook.ts"
+  },
+  "dependencies": {
+    "ai": "^6.0.3",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@ai-sdk/anthropic": "^1.0.0",
+    "@ai-sdk/google": "^1.0.0",
+    "@ai-sdk/openai": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@ai-sdk/openai": {
+      "optional": true
+    },
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google": {
+      "optional": true
+    }
+  }
+}
