@@ -16,6 +16,17 @@
  * - Typography: Font stack definitions
  */
 
+/**
+ * CSS @property registration for animatable custom properties.
+ * Required for smooth CSS transitions on custom properties.
+ * Per UX-42: Animation targets opacity not blur amount for 60fps guarantee.
+ */
+@property --frost-opacity {
+  syntax: "<number>";
+  initial-value: 1;
+  inherits: false;
+}
+
 :root {
   /* Guardian Pulse Animation (Analyst tier - cool neutral)
      ADR-TOKEN-002: High lightness (L>=0.85) ensures pulse is visible against dark card background */
@@ -45,6 +56,28 @@
      ADR-TOKEN-003: 500ms reveal is "intentional action" range; 200ms expand keeps streaming snappy */
   --transition-reveal: 500ms;
   --transition-expand: 200ms;
+
+  /* Card Reveal Animation (Story 2.3)
+     ADR: Earned reveals use ease-out-expo for satisfying snap; override uses linear for mechanical feel */
+  --duration-reveal: 600ms; /* Earned reveal: 500-700ms range (UX-01) */
+  --duration-reveal-override: 350ms; /* Override reveal: 300-400ms range (UX-35) */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1); /* Satisfying snap easing */
+
+  /* Guardian Tier Max Heights (UX-55)
+     ADR: Negotiator gets compact area (~5-6 lines); Therapist gets taller area (~8 lines) */
+  --guardian-max-height-negotiator: 250px;
+  --guardian-max-height-therapist: 350px;
+
+  /* Guardian Pulse Animation Duration
+     ADR: 2s cycle for subtle, non-distracting pulsing effect during active state */
+  --pulse-duration: 2s;
+
+  /* Error State (Story 2.6)
+     ADR: --destructive already exists in Tailwind theme — use for error indicators
+     --guardian-error-bg: Subtle warm-tinted background for error fallback area
+     --duration-pulse-fade: Graceful pulse stop animation before error UI appears */
+  --guardian-error-bg: oklch(0.95 0.03 22);
+  --duration-pulse-fade: 300ms;
 
   /* Typography
      ADR: Geist Sans is Next.js default; JetBrains Mono for data/codes
