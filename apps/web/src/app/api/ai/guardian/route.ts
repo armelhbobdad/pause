@@ -12,6 +12,7 @@ import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import z from "zod";
+import { TOOL_NAMES } from "@/lib/guardian/tool-names";
 import { loadUserSkillbook } from "@/lib/server/ace";
 import { ANALYST_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/analyst";
 import { NEGOTIATOR_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/negotiator";
@@ -21,6 +22,7 @@ import {
   determineTier,
   type InteractionTier,
 } from "@/lib/server/guardian/tiers";
+import { searchCouponsTool } from "@/lib/server/guardian/tools/coupon-search";
 import { getGuardianTelemetry, logDegradationTrace } from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
@@ -176,10 +178,17 @@ export async function POST(req: Request) {
       model: google("gemini-2.5-flash"),
       system: systemPrompt,
       messages: modelMessages,
+      tools: {
+        [TOOL_NAMES.SEARCH_COUPONS]: searchCouponsTool,
+      },
       prepareStep: () => {
-        // On step 0: tier already configured via system parameter above.
-        // On subsequent steps: maintain same tier configuration.
-        // TODO(Story 4.1/5.1): Return activeTools based on tier.
+        if (tier === "negotiator") {
+          return {
+            toolCallStreaming: true,
+            activeTools: [TOOL_NAMES.SEARCH_COUPONS],
+          };
+        }
+        // Therapist tools added in Story 5.1
         return {};
       },
       stopWhen: stepCountIs(isAutoApproved ? 1 : 5),
