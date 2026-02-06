@@ -2,13 +2,13 @@
 
 import type { ReactNode, TransitionEvent } from "react";
 import { useEffect, useRef, useState } from "react";
+import type { GuardianTier } from "@/lib/guardian/types";
+
+export type { GuardianTier } from "@/lib/guardian/types";
 
 // ============================================================================
 // Types
 // ============================================================================
-
-/** Guardian tier determining max-height for the conversation area */
-export type GuardianTier = "negotiator" | "therapist";
 
 export interface GuardianConversationProps {
   /** Whether the Guardian conversation area should be expanded */

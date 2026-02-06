@@ -20,7 +20,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@pause/db/schema": ["../../packages/db/src/schema/index.ts"],
+      "@pause/db": ["../../packages/db/src/index.ts"],
+      "@pause/auth": ["../../packages/auth/src/index.ts"]
     }
   },
   "include": [

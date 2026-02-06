@@ -1,0 +1,415 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// --- Hoisted mocks for configurable test state ---
+const mocks = vi.hoisted(() => {
+  const mockSelect = vi.fn();
+  const mockInsert = vi.fn();
+  const mockUpdate = vi.fn();
+  const mockAfter = vi.fn();
+
+  return {
+    session: null as { user: { id: string } } | null,
+    cardResult: [] as Array<{ id: string; userId: string }>,
+    insertError: null as Error | null,
+    streamResult: {
+      toUIMessageStreamResponse: () =>
+        new Response("stream-body", {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        }),
+      text: Promise.resolve("mock response text") as Promise<string>,
+    },
+    streamTextError: null as Error | null,
+    mockSelect,
+    mockInsert,
+    mockUpdate,
+    mockAfter,
+  };
+});
+
+// --- Mock server-only (prevents "This module cannot be imported from a Client Component module" error) ---
+vi.mock("server-only", () => ({}));
+
+// --- Mock next/headers ---
+vi.mock("next/headers", () => ({
+  headers: () => Promise.resolve(new Headers()),
+}));
+
+// --- Mock next/server ---
+vi.mock("next/server", () => ({
+  after: mocks.mockAfter,
+}));
+
+// --- Mock @pause/auth ---
+vi.mock("@pause/auth", () => ({
+  auth: {
+    api: {
+      getSession: () => Promise.resolve(mocks.session),
+    },
+  },
+}));
+
+// --- Mock @pause/db ---
+vi.mock("@pause/db", () => {
+  const selectChain = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn(() => Promise.resolve(mocks.cardResult)),
+  };
+
+  const insertChain = {
+    values: vi.fn(() => {
+      if (mocks.insertError) {
+        return Promise.reject(mocks.insertError);
+      }
+      return Promise.resolve();
+    }),
+  };
+
+  const updateChain = {
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn(() => Promise.resolve()),
+  };
+
+  mocks.mockSelect.mockReturnValue(selectChain);
+  mocks.mockInsert.mockReturnValue(insertChain);
+  mocks.mockUpdate.mockReturnValue(updateChain);
+
+  return {
+    db: {
+      select: mocks.mockSelect,
+      insert: mocks.mockInsert,
+      update: mocks.mockUpdate,
+    },
+  };
+});
+
+vi.mock("@pause/db/schema", () => ({
+  card: { id: "card.id", userId: "card.userId" },
+  interaction: { id: "interaction.id" },
+}));
+
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn((a: unknown, b: unknown) => ({ eq: [a, b] })),
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
+}));
+
+// --- Mock AI SDK ---
+vi.mock("ai", () => ({
+  convertToModelMessages: vi.fn((msgs: unknown) => Promise.resolve(msgs)),
+  streamText: vi.fn(() => {
+    if (mocks.streamTextError) {
+      throw mocks.streamTextError;
+    }
+    return mocks.streamResult;
+  }),
+}));
+
+vi.mock("@ai-sdk/google", () => ({
+  google: vi.fn(() => "mock-gemini-model"),
+}));
+
+// --- Mock server-side Guardian utilities ---
+vi.mock("@/lib/server/ace", () => ({
+  wrapSkillbookContext: vi.fn(() => ""),
+}));
+
+vi.mock("@/lib/server/opik", () => ({
+  getGuardianTelemetry: vi.fn((id: string) => ({
+    isEnabled: true,
+    metadata: { interactionId: id },
+  })),
+}));
+
+vi.mock("@/lib/server/guardian/prompts/analyst", () => ({
+  ANALYST_SYSTEM_PROMPT: "You are a test analyst prompt.",
+}));
+
+// --- Import the route handler ---
+import { maxDuration, POST, runtime } from "./route";
+
+function createRequest(body: Record<string, unknown>): Request {
+  return new Request("http://localhost/api/ai/guardian", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+const UUID_REGEX = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/;
+
+const validBody = {
+  messages: [{ role: "user", content: "test", id: "msg-1" }],
+  cardId: "card-123",
+};
+
+describe("Guardian Route Handler", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.session = { user: { id: "user-1" } };
+    mocks.cardResult = [{ id: "card-123", userId: "user-1" }];
+    mocks.insertError = null;
+    mocks.streamTextError = null;
+    mocks.streamResult.text = Promise.resolve("mock response text");
+
+    // Re-setup mock chains after clearAllMocks
+    const selectChain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn(() => Promise.resolve(mocks.cardResult)),
+    };
+    const insertChain = {
+      values: vi.fn(() => {
+        if (mocks.insertError) {
+          return Promise.reject(mocks.insertError);
+        }
+        return Promise.resolve();
+      }),
+    };
+    const updateChain = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn(() => Promise.resolve()),
+    };
+
+    mocks.mockSelect.mockReturnValue(selectChain);
+    mocks.mockInsert.mockReturnValue(insertChain);
+    mocks.mockUpdate.mockReturnValue(updateChain);
+  });
+
+  // ========================================================================
+  // Module exports
+  // ========================================================================
+
+  describe("module exports", () => {
+    it("exports runtime as nodejs (AC#4)", () => {
+      expect(runtime).toBe("nodejs");
+    });
+
+    it("exports maxDuration as 30 (AC#17)", () => {
+      expect(maxDuration).toBe(30);
+    });
+  });
+
+  // ========================================================================
+  // Authentication (AC#2)
+  // ========================================================================
+
+  describe("authentication (AC#2)", () => {
+    it("returns 401 for unauthenticated requests", async () => {
+      mocks.session = null;
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(401);
+    });
+
+    it("proceeds for authenticated requests", async () => {
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(200);
+    });
+  });
+
+  // ========================================================================
+  // Request validation (AC#1)
+  // ========================================================================
+
+  describe("request validation (AC#1)", () => {
+    it("returns 400 for missing cardId", async () => {
+      const response = await POST(
+        createRequest({ messages: [{ role: "user", content: "hi" }] })
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it("returns 400 for empty cardId", async () => {
+      const response = await POST(createRequest({ messages: [], cardId: "" }));
+      expect(response.status).toBe(400);
+    });
+
+    it("accepts valid request with optional purchaseContext", async () => {
+      const response = await POST(
+        createRequest({ ...validBody, purchaseContext: "electronics" })
+      );
+      expect(response.status).toBe(200);
+    });
+  });
+
+  // ========================================================================
+  // Authorization (AC#3)
+  // ========================================================================
+
+  describe("authorization (AC#3)", () => {
+    it("returns 403 when card not found", async () => {
+      mocks.cardResult = [];
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(403);
+    });
+  });
+
+  // ========================================================================
+  // Skeleton interaction write (AC#9)
+  // ========================================================================
+
+  describe("skeleton interaction write (AC#9)", () => {
+    it("writes skeleton interaction before streaming", async () => {
+      await POST(createRequest(validBody));
+      expect(mocks.mockInsert).toHaveBeenCalled();
+    });
+
+    it("returns 500 when skeleton write fails", async () => {
+      mocks.insertError = new Error("DB write failed");
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(500);
+    });
+  });
+
+  // ========================================================================
+  // Streaming response (AC#5, #10)
+  // ========================================================================
+
+  describe("streaming response (AC#5, #10)", () => {
+    it("returns streaming response with correct status", async () => {
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(200);
+    });
+
+    it("includes x-interaction-id header (AC#10)", async () => {
+      const response = await POST(createRequest(validBody));
+      const interactionId = response.headers.get("x-interaction-id");
+      expect(interactionId).toBeTruthy();
+      expect(interactionId).toMatch(UUID_REGEX);
+    });
+  });
+
+  // ========================================================================
+  // Error degradation (AC#14)
+  // ========================================================================
+
+  describe("error degradation (AC#14)", () => {
+    it("returns 500 when DB card query fails", async () => {
+      mocks.mockSelect.mockReturnValueOnce({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn(() => Promise.reject(new Error("DB error"))),
+      });
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(500);
+    });
+  });
+
+  // ========================================================================
+  // after() callback (AC#9, #15)
+  // ========================================================================
+
+  describe("after() callback (Task 4)", () => {
+    it("registers after() callback for interaction completion", async () => {
+      await POST(createRequest(validBody));
+      expect(mocks.mockAfter).toHaveBeenCalledWith(expect.any(Function));
+    });
+
+    it("after() callback updates interaction status to completed", async () => {
+      await POST(createRequest(validBody));
+
+      // Execute the after() callback
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      expect(mocks.mockUpdate).toHaveBeenCalled();
+    });
+
+    it("after() callback handles DB update errors gracefully", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      mocks.mockUpdate.mockReturnValueOnce({
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn(() => Promise.reject(new Error("DB update failed"))),
+      });
+
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await expect(callback()).resolves.toBeUndefined();
+      }
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[Guardian] Failed to update interaction"),
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("after() skips status update when stream generation fails", async () => {
+      mocks.streamResult.text = Promise.reject(
+        new Error("Stream generation failed")
+      );
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      expect(mocks.mockUpdate).not.toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Stream failed for interaction")
+      );
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  // ========================================================================
+  // Stream initialization error (AC#14, AC#15)
+  // ========================================================================
+
+  describe("stream initialization error (AC#14)", () => {
+    it("returns 500 when streamText throws", async () => {
+      mocks.streamTextError = new Error("Model initialization failed");
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(500);
+      expect(await response.text()).toBe("Stream initialization failed");
+    });
+  });
+
+  // ========================================================================
+  // Skillbook loading (AC#13)
+  // ========================================================================
+
+  describe("skillbook loading (AC#13)", () => {
+    it("proceeds with empty skillbook context (stub returns empty string)", async () => {
+      const response = await POST(createRequest(validBody));
+      // wrapSkillbookContext() stub returns "" — route should succeed
+      expect(response.status).toBe(200);
+    });
+  });
+
+  // ========================================================================
+  // purchaseContext validation (M3 — length limit)
+  // ========================================================================
+
+  describe("purchaseContext validation", () => {
+    it("returns 400 for purchaseContext exceeding 500 characters", async () => {
+      const longContext = "a".repeat(501);
+      const response = await POST(
+        createRequest({ ...validBody, purchaseContext: longContext })
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it("accepts purchaseContext at exactly 500 characters", async () => {
+      const maxContext = "a".repeat(500);
+      const response = await POST(
+        createRequest({ ...validBody, purchaseContext: maxContext })
+      );
+      expect(response.status).toBe(200);
+    });
+  });
+});

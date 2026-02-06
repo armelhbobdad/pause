@@ -7,6 +7,15 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
+      "@pause/db/schema": resolve(__dirname, "../../packages/db/src/schema"),
+      "@pause/db": resolve(__dirname, "../../packages/db/src/index.ts"),
+      "@pause/auth": resolve(__dirname, "../../packages/auth/src/index.ts"),
+      "@pause/env/server": resolve(
+        __dirname,
+        "../../packages/env/src/server.ts"
+      ),
+      "@pause/env/web": resolve(__dirname, "../../packages/env/src/web.ts"),
+      "@pause/env": resolve(__dirname, "../../packages/env/src/index.ts"),
     },
   },
   test: {
@@ -14,5 +23,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/__tests__/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    server: {
+      deps: {
+        inline: ["@pause/db", "@pause/auth", "@pause/env"],
+      },
+    },
   },
 });
