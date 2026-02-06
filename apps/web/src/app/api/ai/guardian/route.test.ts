@@ -135,6 +135,7 @@ vi.mock("@/lib/server/opik", () => ({
     isEnabled: true,
     metadata: { interactionId: id },
   })),
+  logDegradationTrace: vi.fn(),
 }));
 
 vi.mock("@/lib/server/guardian/prompts/analyst", () => ({
@@ -407,15 +408,188 @@ describe("Guardian Route Handler", () => {
   });
 
   // ========================================================================
-  // Stream initialization error (AC#14, AC#15)
+  // Degradation ladder (Story 3.6)
   // ========================================================================
 
-  describe("stream initialization error (AC#14)", () => {
-    it("returns 500 when streamText throws", async () => {
+  describe("degradation ladder (Story 3.6)", () => {
+    it("analyst-only fallback: returns auto-approve headers when streamText throws and tier is analyst", async () => {
+      // Default mock returns score 10 → analyst tier
       mocks.streamTextError = new Error("Model initialization failed");
       const response = await POST(createRequest(validBody));
-      expect(response.status).toBe(500);
-      expect(await response.text()).toBe("Stream initialization failed");
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-guardian-auto-approved")).toBe("true");
+      expect(response.headers.get("x-guardian-degraded")).toBe("true");
+      expect(response.headers.get("x-guardian-tier")).toBe("analyst");
+      expect(await response.text()).toBe("Looks good! Card unlocked.");
+    });
+
+    it("break glass fallback: returns x-guardian-break-glass header when streamText throws and tier is negotiator", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      mocks.streamTextError = new Error("Model initialization failed");
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-guardian-break-glass")).toBe("true");
+      expect(response.headers.get("x-guardian-tier")).toBe("negotiator");
+      expect(response.headers.get("x-guardian-auto-approved")).toBeNull();
+    });
+
+    it("break glass fallback: returns x-guardian-break-glass header when tier is therapist", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 80,
+        factors: [],
+        reasoning: "test-therapist",
+        historyAvailable: true,
+      });
+      mocks.streamTextError = new Error("Model initialization failed");
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-guardian-break-glass")).toBe("true");
+      expect(response.headers.get("x-guardian-tier")).toBe("therapist");
+    });
+
+    it("analyst-only fallback: after() callback sets outcome to auto_approved", async () => {
+      mocks.streamTextError = new Error("Model initialization failed");
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      expect(updateReturn?.set).toHaveBeenCalledWith({
+        status: "completed",
+        outcome: "auto_approved",
+      });
+    });
+
+    it("break glass fallback: after() callback sets outcome to break_glass", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      mocks.streamTextError = new Error("Model initialization failed");
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      expect(updateReturn?.set).toHaveBeenCalledWith({
+        status: "completed",
+        outcome: "break_glass",
+      });
+    });
+
+    it("degradation after() callback handles DB errors gracefully", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      mocks.mockUpdate.mockReturnValueOnce({
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn(() => Promise.reject(new Error("DB update failed"))),
+      });
+
+      mocks.streamTextError = new Error("Model initialization failed");
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await expect(callback()).resolves.toBeUndefined();
+      }
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "[Guardian] Failed to update degraded interaction"
+        ),
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("next request after degradation attempts Full Guardian again (no sticky state)", async () => {
+      // First request: streamText throws → degradation
+      mocks.streamTextError = new Error("Model initialization failed");
+      const degradedResponse = await POST(createRequest(validBody));
+      expect(degradedResponse.headers.get("x-guardian-auto-approved")).toBe(
+        "true"
+      );
+      expect(degradedResponse.headers.get("x-guardian-degraded")).toBe("true");
+
+      // Second request: streamText succeeds → normal flow
+      mocks.streamTextError = null;
+      const normalResponse = await POST(createRequest(validBody));
+      expect(normalResponse.status).toBe(200);
+      expect(normalResponse.headers.get("x-guardian-degraded")).toBeNull();
+    });
+
+    it("analyst-only fallback includes x-guardian-degraded: true header", async () => {
+      mocks.streamTextError = new Error("Model initialization failed");
+      const response = await POST(createRequest(validBody));
+      expect(response.headers.get("x-guardian-degraded")).toBe("true");
+    });
+
+    it("logs degradation event with failure reason", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      mocks.streamTextError = new Error("Model initialization failed");
+      await POST(createRequest(validBody));
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[Guardian] Degradation activated")
+        // No second arg — it's a single formatted string
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("calls logDegradationTrace with analyst_only for analyst degradation", async () => {
+      const { logDegradationTrace } = await import("@/lib/server/opik");
+      mocks.streamTextError = new Error("Model initialization failed");
+      await POST(createRequest(validBody));
+      expect(logDegradationTrace).toHaveBeenCalledWith(
+        expect.any(String),
+        "analyst_only",
+        "Model initialization failed",
+        expect.objectContaining({ score: 10, reasoning: "test" }),
+        "analyst"
+      );
+    });
+
+    it("calls logDegradationTrace with break_glass for non-analyst degradation", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      const { logDegradationTrace } = await import("@/lib/server/opik");
+      mocks.streamTextError = new Error("Model initialization failed");
+      await POST(createRequest(validBody));
+      expect(logDegradationTrace).toHaveBeenCalledWith(
+        expect.any(String),
+        "break_glass",
+        "Model initialization failed",
+        expect.objectContaining({ score: 50, reasoning: "test-negotiator" }),
+        "negotiator"
+      );
     });
   });
 

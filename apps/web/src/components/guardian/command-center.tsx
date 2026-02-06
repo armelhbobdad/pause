@@ -117,6 +117,8 @@ function CommandCenterInner({
   // using a custom fetch wrapper on the transport, then dispatch the reveal
   // action in the onFinish callback after the stream completes.
   const autoApprovedRef = useRef(false);
+  const breakGlassRef = useRef(false);
+  const degradedRef = useRef(false);
 
   // --- useChat integration (Story 3.1, AC#18) ---
   // React Compiler memoizes the transport instance based on cardId stability.
@@ -129,18 +131,65 @@ function CommandCenterInner({
         const response = await fetch(input, init);
         autoApprovedRef.current =
           response.headers.get("x-guardian-auto-approved") === "true";
+        breakGlassRef.current =
+          response.headers.get("x-guardian-break-glass") === "true";
+        degradedRef.current =
+          response.headers.get("x-guardian-degraded") === "true";
         return response;
       },
     }),
     onFinish: () => {
+      if (breakGlassRef.current) {
+        guardianError();
+        toast.warning("Guardian unavailable. Manual unlock enabled.", {
+          duration: 4000,
+        });
+        breakGlassRef.current = false;
+        return;
+      }
       if (autoApprovedRef.current) {
+        if (degradedRef.current) {
+          toast.info("Quick approval — Guardian running in lite mode", {
+            duration: 3000,
+          });
+        } else {
+          toast.success("Auto-approved", { duration: 2000 });
+        }
         revealApproved();
-        toast.success("Auto-approved", { duration: 2000 });
         autoApprovedRef.current = false;
+        degradedRef.current = false;
+        return;
       }
     },
     onError: () => {
+      // Degraded responses (non-streaming) may trigger onError instead of onFinish.
+      // Check refs set by the fetch wrapper before falling through to generic error.
+      if (breakGlassRef.current) {
+        guardianError();
+        toast.warning("Guardian unavailable. Manual unlock enabled.", {
+          duration: 4000,
+        });
+        autoApprovedRef.current = false;
+        breakGlassRef.current = false;
+        degradedRef.current = false;
+        return;
+      }
+      if (autoApprovedRef.current) {
+        if (degradedRef.current) {
+          toast.info("Quick approval — Guardian running in lite mode", {
+            duration: 3000,
+          });
+        } else {
+          toast.success("Auto-approved", { duration: 2000 });
+        }
+        revealApproved();
+        autoApprovedRef.current = false;
+        degradedRef.current = false;
+        return;
+      }
       autoApprovedRef.current = false;
+      breakGlassRef.current = false;
+      degradedRef.current = false;
       guardianError();
     },
   });

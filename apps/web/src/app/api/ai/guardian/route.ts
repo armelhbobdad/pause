@@ -21,7 +21,7 @@ import {
   determineTier,
   type InteractionTier,
 } from "@/lib/server/guardian/tiers";
-import { getGuardianTelemetry } from "@/lib/server/opik";
+import { getGuardianTelemetry, logDegradationTrace } from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
 const TIER_PROMPTS: Record<InteractionTier, string> = {
@@ -237,8 +237,71 @@ export async function POST(req: Request) {
       status: response.status,
       headers: headers2,
     });
-  } catch {
+  } catch (error) {
     serviceHealth.gemini = false;
-    return new Response("Stream initialization failed", { status: 500 });
+    const failureReason =
+      error instanceof Error ? error.message : "Unknown stream failure";
+    console.error(
+      `[Guardian] Degradation activated for ${interactionId}: tier=${tier}, reason=${failureReason}`
+    );
+
+    // --- Degradation telemetry (Story 3.6, AC#2, AC#4) ---
+    logDegradationTrace(
+      interactionId,
+      tier === "analyst" ? "analyst_only" : "break_glass",
+      failureReason,
+      { score: riskResult.score, reasoning: riskResult.reasoning },
+      tier
+    );
+
+    // --- Degradation Ladder (Story 3.6) ---
+    // Level 1: Analyst-only fallback — risk assessment already completed
+    if (tier === "analyst") {
+      after(async () => {
+        try {
+          await db
+            .update(interaction)
+            .set({ status: "completed", outcome: "auto_approved" })
+            .where(eq(interaction.id, interactionId));
+        } catch (updateError) {
+          console.error(
+            `[Guardian] Failed to update degraded interaction ${interactionId}:`,
+            updateError
+          );
+        }
+      });
+
+      return new Response("Looks good! Card unlocked.", {
+        headers: {
+          "x-interaction-id": interactionId,
+          "x-guardian-tier": tier,
+          "x-guardian-auto-approved": "true",
+          "x-guardian-degraded": "true",
+        },
+      });
+    }
+
+    // Level 2: Break Glass — non-analyst tiers or risk assessment failed
+    after(async () => {
+      try {
+        await db
+          .update(interaction)
+          .set({ status: "completed", outcome: "break_glass" })
+          .where(eq(interaction.id, interactionId));
+      } catch (updateError) {
+        console.error(
+          `[Guardian] Failed to update degraded interaction ${interactionId}:`,
+          updateError
+        );
+      }
+    });
+
+    return new Response("", {
+      headers: {
+        "x-interaction-id": interactionId,
+        "x-guardian-tier": tier,
+        "x-guardian-break-glass": "true",
+      },
+    });
   }
 }
