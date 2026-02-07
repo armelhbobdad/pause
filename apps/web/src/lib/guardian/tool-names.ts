@@ -12,10 +12,12 @@
 export type ToolName =
   | "search_coupons"
   | "present_reflection"
-  | "show_wait_option";
+  | "show_wait_option"
+  | "present_wizard_option";
 
 export const TOOL_NAMES = {
   SEARCH_COUPONS: "search_coupons",
   PRESENT_REFLECTION: "present_reflection",
   SHOW_WAIT_OPTION: "show_wait_option",
+  PRESENT_WIZARD_OPTION: "present_wizard_option",
 } as const satisfies Record<string, ToolName>;

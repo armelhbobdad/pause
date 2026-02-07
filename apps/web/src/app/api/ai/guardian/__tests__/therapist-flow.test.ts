@@ -118,6 +118,7 @@ vi.mock("@/lib/guardian/tool-names", () => ({
     SEARCH_COUPONS: "search_coupons",
     PRESENT_REFLECTION: "present_reflection",
     SHOW_WAIT_OPTION: "show_wait_option",
+    PRESENT_WIZARD_OPTION: "present_wizard_option",
   },
 }));
 
@@ -156,6 +157,18 @@ vi.mock("@/lib/server/guardian/tools/wait-option", () => ({
     inputSchema: {},
     execute: vi.fn((input: { reasoning: string }) => ({
       durationHours: 24,
+      reasoning: input.reasoning,
+    })),
+  },
+}));
+
+// --- Mock wizard option tool (with real pass-through logic) ---
+vi.mock("@/lib/server/guardian/tools/wizard-option", () => ({
+  presentWizardOptionTool: {
+    description: "Offer deeper reflection wizard",
+    inputSchema: {},
+    execute: vi.fn((input: { reasoning: string }) => ({
+      wizardAvailable: true,
       reasoning: input.reasoning,
     })),
   },
@@ -425,15 +438,16 @@ describe("Therapist flow integration (Story 5.2)", () => {
       expect(mod.THERAPIST_SYSTEM_PROMPT).toContain("Scan Skillbook");
     });
 
-    it("includes tool usage documentation for both tools", async () => {
+    it("includes tool usage documentation for all three tools", async () => {
       const mod = await vi.importActual<{
         THERAPIST_SYSTEM_PROMPT: string;
       }>("@/lib/server/guardian/prompts/therapist");
 
       expect(mod.THERAPIST_SYSTEM_PROMPT).toContain("present_reflection");
       expect(mod.THERAPIST_SYSTEM_PROMPT).toContain("show_wait_option");
+      expect(mod.THERAPIST_SYSTEM_PROMPT).toContain("present_wizard_option");
       expect(mod.THERAPIST_SYSTEM_PROMPT).toContain(
-        "Call this after presenting the reflection"
+        "Call this second, after presenting the reflection"
       );
     });
 

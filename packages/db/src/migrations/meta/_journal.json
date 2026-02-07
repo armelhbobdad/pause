@@ -43,6 +43,13 @@
       "when": 1770456245894,
       "tag": "0005_curvy_yellowjacket",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770457441346,
+      "tag": "0006_fair_miss_america",
+      "breakpoints": true
     }
   ]
 }

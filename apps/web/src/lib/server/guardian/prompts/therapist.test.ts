@@ -60,9 +60,14 @@ describe("THERAPIST_SYSTEM_PROMPT", () => {
   });
 
   // --- Story 5.2 AC8: prompt minimality after tool call ---
-  it("instructs LLM to produce minimal/empty text after calling both tools (AC8)", () => {
+  it("instructs LLM to produce minimal/empty text after calling tools (AC8)", () => {
     expect(THERAPIST_SYSTEM_PROMPT).toContain(
-      "minimal or empty after calling both tools"
+      "minimal or empty after calling tools"
     );
+  });
+
+  // --- Story 5.5: wizard tool instructions ---
+  it("mentions present_wizard_option tool for high-risk purchases", () => {
+    expect(THERAPIST_SYSTEM_PROMPT).toContain("present_wizard_option");
   });
 });

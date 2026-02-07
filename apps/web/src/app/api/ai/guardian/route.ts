@@ -26,6 +26,7 @@ import {
 import { searchCouponsTool } from "@/lib/server/guardian/tools/coupon-search";
 import { presentReflectionTool } from "@/lib/server/guardian/tools/reflection-prompt";
 import { showWaitOptionTool } from "@/lib/server/guardian/tools/wait-option";
+import { presentWizardOptionTool } from "@/lib/server/guardian/tools/wizard-option";
 import { getGuardianTelemetry, logDegradationTrace } from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
@@ -191,6 +192,7 @@ export async function POST(req: Request) {
         [TOOL_NAMES.SEARCH_COUPONS]: searchCouponsTool,
         [TOOL_NAMES.PRESENT_REFLECTION]: presentReflectionTool,
         [TOOL_NAMES.SHOW_WAIT_OPTION]: showWaitOptionTool,
+        [TOOL_NAMES.PRESENT_WIZARD_OPTION]: presentWizardOptionTool,
       },
       prepareStep: () => {
         if (tier === "negotiator") {
@@ -200,13 +202,14 @@ export async function POST(req: Request) {
           };
         }
         if (tier === "therapist") {
-          return {
-            toolCallStreaming: true,
-            activeTools: [
-              TOOL_NAMES.PRESENT_REFLECTION,
-              TOOL_NAMES.SHOW_WAIT_OPTION,
-            ],
-          };
+          const activeTools: import("@/lib/guardian/tool-names").ToolName[] = [
+            TOOL_NAMES.PRESENT_REFLECTION,
+            TOOL_NAMES.SHOW_WAIT_OPTION,
+          ];
+          if (riskResult.score >= 85) {
+            activeTools.push(TOOL_NAMES.PRESENT_WIZARD_OPTION);
+          }
+          return { toolCallStreaming: true, activeTools };
         }
         return {};
       },
