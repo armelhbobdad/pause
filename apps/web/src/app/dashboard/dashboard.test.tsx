@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // --- Hoisted mocks ---
 const mocks = vi.hoisted(() => ({
-  queryResult: {
+  useQueryCallIndex: 0,
+  dashboardResult: {
     data: undefined as
       | {
           interactionCount: number;
@@ -25,6 +26,23 @@ const mocks = vi.hoisted(() => ({
     error: null as Error | null,
     refetch: vi.fn(),
   },
+  savingsResult: {
+    data: undefined as
+      | {
+          totalCents: number;
+          dealCount: number;
+          avgCents: number;
+          sourceBreakdown: Array<{
+            source: string;
+            totalCents: number;
+            count: number;
+          }>;
+        }
+      | undefined,
+    isLoading: false,
+    error: null as Error | null,
+    refetch: vi.fn(),
+  },
 }));
 
 // --- Mock @tanstack/react-query useQuery ---
@@ -32,7 +50,11 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-query")>();
   return {
     ...actual,
-    useQuery: vi.fn(() => mocks.queryResult),
+    useQuery: vi.fn(() => {
+      const idx = mocks.useQueryCallIndex++;
+      // First useQuery call is dashboard.summary, second is savings.getSummary
+      return idx === 0 ? mocks.dashboardResult : mocks.savingsResult;
+    }),
   };
 });
 
@@ -43,6 +65,14 @@ vi.mock("@/utils/trpc", () => ({
       summary: {
         queryOptions: vi.fn(() => ({
           queryKey: ["dashboard", "summary"],
+          queryFn: vi.fn(),
+        })),
+      },
+    },
+    savings: {
+      getSummary: {
+        queryOptions: vi.fn(() => ({
+          queryKey: ["savings", "getSummary"],
           queryFn: vi.fn(),
         })),
       },
@@ -72,7 +102,14 @@ function renderDashboard() {
 describe("Dashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.queryResult = {
+    mocks.useQueryCallIndex = 0;
+    mocks.dashboardResult = {
+      data: undefined,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    mocks.savingsResult = {
       data: undefined,
       isLoading: false,
       error: null,
@@ -81,7 +118,7 @@ describe("Dashboard", () => {
   });
 
   it("skeleton loading state renders", () => {
-    mocks.queryResult.isLoading = true;
+    mocks.dashboardResult.isLoading = true;
 
     renderDashboard();
 
@@ -93,7 +130,7 @@ describe("Dashboard", () => {
       /* suppress test output — AC#8 requires console.error logging */
     });
     const user = userEvent.setup();
-    mocks.queryResult.error = new Error("Network error");
+    mocks.dashboardResult.error = new Error("Network error");
 
     renderDashboard();
 
@@ -103,20 +140,20 @@ describe("Dashboard", () => {
     ).toBeInTheDocument();
     expect(consoleSpy).toHaveBeenCalledWith(
       "Dashboard query failed:",
-      mocks.queryResult.error
+      mocks.dashboardResult.error
     );
 
     const retryButton = screen.getByRole("button", { name: "Retry" });
     expect(retryButton).toBeInTheDocument();
 
     await user.click(retryButton);
-    expect(mocks.queryResult.refetch).toHaveBeenCalledOnce();
+    expect(mocks.dashboardResult.refetch).toHaveBeenCalledOnce();
 
     consoleSpy.mockRestore();
   });
 
   it("data renders sections", () => {
-    mocks.queryResult.data = {
+    mocks.dashboardResult.data = {
       interactionCount: 5,
       totalSavedCents: 2500,
       acceptanceRate: 80,
@@ -146,18 +183,55 @@ describe("Dashboard", () => {
   });
 
   it("revalidation updates UI without spinner", () => {
-    mocks.queryResult.data = {
+    mocks.dashboardResult.data = {
       interactionCount: 3,
       totalSavedCents: 1500,
       acceptanceRate: 66.7,
       recentInteractions: [],
     };
-    mocks.queryResult.isLoading = false;
+    mocks.dashboardResult.isLoading = false;
 
     renderDashboard();
 
     // Data visible, no skeleton
     expect(screen.getByTestId("total-saved")).toHaveTextContent("$15.00");
     expect(screen.queryByTestId("dashboard-skeleton")).not.toBeInTheDocument();
+  });
+
+  it("renders savings counter and breakdown when savings data is loaded", () => {
+    mocks.dashboardResult.data = {
+      interactionCount: 3,
+      totalSavedCents: 6200,
+      acceptanceRate: 100,
+      recentInteractions: [],
+    };
+    mocks.savingsResult.data = {
+      totalCents: 6200,
+      dealCount: 2,
+      avgCents: 3100,
+      sourceBreakdown: [
+        { source: "TechDeals", totalCents: 4200, count: 1 },
+        { source: "RetailCo", totalCents: 2000, count: 1 },
+      ],
+    };
+
+    renderDashboard();
+
+    expect(screen.getByTestId("savings-counter")).toBeInTheDocument();
+    expect(screen.getByTestId("savings-breakdown")).toBeInTheDocument();
+  });
+
+  it("hides savings counter when savings data is loading", () => {
+    mocks.dashboardResult.data = {
+      interactionCount: 3,
+      totalSavedCents: 6200,
+      acceptanceRate: 100,
+      recentInteractions: [],
+    };
+    mocks.savingsResult.isLoading = true;
+
+    renderDashboard();
+
+    expect(screen.queryByTestId("savings-counter")).not.toBeInTheDocument();
   });
 });

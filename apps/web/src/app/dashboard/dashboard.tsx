@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { RecentInteractions } from "@/components/dashboard/recent-interactions";
+import { SavingsBreakdown } from "@/components/dashboard/savings-breakdown";
+import { SavingsCounter } from "@/components/dashboard/savings-counter";
 import { SavingsSummary } from "@/components/dashboard/savings-summary";
 import { GhostCardFeed } from "@/components/guardian/ghost-card-feed";
 import { GhostCardManagerProvider } from "@/components/guardian/ghost-card-manager";
@@ -27,6 +29,11 @@ export default function Dashboard() {
   const { data, isLoading, error, refetch } = useQuery({
     ...trpc.dashboard.summary.queryOptions(),
     refetchOnWindowFocus: true,
+  });
+
+  const { data: savingsData, isLoading: savingsLoading } = useQuery({
+    ...trpc.savings.getSummary.queryOptions(),
+    staleTime: 30_000,
   });
 
   useEffect(() => {
@@ -77,6 +84,19 @@ export default function Dashboard() {
           interactionCount={data.interactionCount}
           totalSavedCents={data.totalSavedCents}
         />
+
+        {!savingsLoading && savingsData && (
+          <>
+            <SavingsCounter totalCents={savingsData.totalCents} />
+            <SavingsBreakdown
+              avgCents={savingsData.avgCents}
+              dealCount={savingsData.dealCount}
+              sourceBreakdown={savingsData.sourceBreakdown}
+              totalCents={savingsData.totalCents}
+            />
+          </>
+        )}
+
         <RecentInteractions interactions={data.recentInteractions} />
 
         <GhostCardManagerProvider>
