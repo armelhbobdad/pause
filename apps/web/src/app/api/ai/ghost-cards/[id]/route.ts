@@ -3,7 +3,9 @@ import { db } from "@pause/db";
 import { ghostCard } from "@pause/db/schema";
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import z from "zod";
+import { runSatisfactionFeedbackLearning } from "@/lib/server/learning";
 import { withTimeout } from "@/lib/server/utils";
 
 export const runtime = "nodejs";
@@ -85,6 +87,20 @@ export async function PATCH(
       { status: 500 }
     );
   }
+
+  // --- Trigger satisfaction learning pipeline (Story 6.6, AC1/6/7) ---
+  after(() =>
+    runSatisfactionFeedbackLearning({
+      ghostCardId: id,
+      userId: session.user.id,
+      satisfactionFeedback: parsed.data.satisfactionFeedback,
+    }).catch((error) => {
+      console.warn(
+        `[SatisfactionLearning] after() callback failed for ${id}:`,
+        error
+      );
+    })
+  );
 
   return Response.json({
     success: true,

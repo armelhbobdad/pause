@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => {
   const mockSkillbookSkills = vi.fn(() => []);
   const mockDbUpdate = vi.fn();
   const mockDbInsert = vi.fn();
+  const mockDbSelect = vi.fn();
+  const mockSatisfactionToFeedbackSignal = vi.fn();
 
   return {
     reflectResult: null as {
@@ -51,6 +53,8 @@ const mocks = vi.hoisted(() => {
     mockSkillbookSkills,
     mockDbUpdate,
     mockDbInsert,
+    mockDbSelect,
+    mockSatisfactionToFeedbackSignal,
   };
 });
 
@@ -91,15 +95,29 @@ vi.mock("@pause/db", () => {
   };
   mocks.mockDbInsert.mockReturnValue(insertChain);
 
+  // Default select chain for ghost card / interaction lookups
+  const selectChain = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn(() => Promise.resolve([])),
+  };
+  mocks.mockDbSelect.mockReturnValue(selectChain);
+
   return {
     db: {
       update: mocks.mockDbUpdate,
       insert: mocks.mockDbInsert,
+      select: mocks.mockDbSelect,
     },
   };
 });
 
 vi.mock("@pause/db/schema", () => ({
+  ghostCard: {
+    id: "ghost_card.id",
+    interactionId: "ghost_card.interactionId",
+    userId: "ghost_card.userId",
+  },
   interaction: {
     id: "interaction.id",
     userId: "interaction.userId",
@@ -126,6 +144,9 @@ vi.mock("@pause/db/schema", () => ({
       "wizard_bookmark",
       "wizard_abandoned",
     ],
+  },
+  satisfactionFeedbackEnum: {
+    enumValues: ["worth_it", "regret_it", "not_sure"],
   },
 }));
 
@@ -163,6 +184,11 @@ vi.mock("@/lib/server/ace", () => ({
   VercelAIClient: vi.fn(),
 }));
 
+// --- Mock ghost-cards (satisfaction mapping) ---
+vi.mock("@/lib/server/ghost-cards", () => ({
+  satisfactionToFeedbackSignal: mocks.mockSatisfactionToFeedbackSignal,
+}));
+
 // --- Mock opik ---
 vi.mock("@/lib/server/opik", () => ({
   getOpikClient: vi.fn(() => mocks.opikClient),
@@ -176,11 +202,17 @@ vi.mock("@/lib/server/utils", () => ({
 // --- Import the module under test ---
 import {
   attachReflectionToTrace,
+  attachSatisfactionFeedbackToTrace,
   attachSkillUpdateToTrace,
   markLearningComplete,
   runReflection,
+  runSatisfactionFeedbackLearning,
   runSkillUpdate,
 } from "./learning";
+
+// Pin refs to prevent linter from stripping (used in describe blocks below)
+const _satTrace = attachSatisfactionFeedbackToTrace;
+const _satLearning = runSatisfactionFeedbackLearning;
 
 const defaultReflectResult = {
   analysis: "The user accepted the suggestion, indicating effective strategy",
@@ -378,6 +410,25 @@ describe("Learning Module", () => {
         question: "buying shoes",
         generatorAnswer: "Try waiting for a deal",
         feedback: "incorrect — user overrode the Guardian's suggestion",
+        skillbook: mocks.skillbookResult.skillbook,
+      });
+    });
+
+    it("uses customFeedback when provided instead of outcome lookup (Story 6.6)", async () => {
+      await runReflection({
+        interactionId: "int-107",
+        userId: "user-1",
+        question: "buying headphones",
+        generatorAnswer: "Consider waiting",
+        outcome: "accepted",
+        customFeedback:
+          "incorrect — user accepted but later regretted the decision",
+      });
+
+      expect(mocks.mockReflect).toHaveBeenCalledWith({
+        question: "buying headphones",
+        generatorAnswer: "Consider waiting",
+        feedback: "incorrect — user accepted but later regretted the decision",
         skillbook: mocks.skillbookResult.skillbook,
       });
     });
@@ -1059,6 +1110,239 @@ describe("Learning Module", () => {
       await expect(markLearningComplete("int-301")).rejects.toThrow(
         "DB write failed"
       );
+    });
+  });
+
+  // ========================================================================
+  // attachSatisfactionFeedbackToTrace — Story 6.6 (AC4)
+  // ========================================================================
+
+  describe("attachSatisfactionFeedbackToTrace", () => {
+    it("creates learning:satisfaction_feedback trace with metadata", async () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn().mockResolvedValue([{ id: "trace-parent" }]),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await _satTrace("int-700", {
+        satisfactionFeedback: "regret_it",
+        originalOutcome: "accepted",
+        mappedSignal: "incorrect — user regrets following suggestion",
+        reflectionAnalysis: "Strategy was ineffective",
+        newLearnings: [{ section: "negotiation", content: "test" }],
+      });
+
+      expect(mocks.opikClient.trace).toHaveBeenCalledWith({
+        name: "learning:satisfaction_feedback",
+        input: expect.objectContaining({
+          interactionId: "int-700",
+          parentTraceId: "trace-parent",
+          satisfactionFeedback: "regret_it",
+          originalOutcome: "accepted",
+          mappedSignal: "incorrect — user regrets following suggestion",
+        }),
+      });
+      expect(mockTrace.end).toHaveBeenCalled();
+      expect(mocks.opikClient.flush).toHaveBeenCalled();
+    });
+
+    it("does nothing when Opik client is null", async () => {
+      mocks.opikClient = null;
+
+      // Should not throw
+      await _satTrace("int-701", {
+        satisfactionFeedback: "worth_it",
+        originalOutcome: "overridden",
+        mappedSignal: "test",
+        reflectionAnalysis: "test",
+        newLearnings: [],
+      });
+    });
+
+    it("does not create trace when guardian trace not found", async () => {
+      mocks.opikClient = {
+        searchTraces: vi.fn().mockResolvedValue([]),
+        trace: vi.fn(),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await _satTrace("int-702", {
+        satisfactionFeedback: "worth_it",
+        originalOutcome: "accepted",
+        mappedSignal: "test",
+        reflectionAnalysis: "test",
+        newLearnings: [],
+      });
+
+      expect(mocks.opikClient.trace).not.toHaveBeenCalled();
+      expect(mocks.opikClient.flush).not.toHaveBeenCalled();
+    });
+  });
+
+  // ========================================================================
+  // runSatisfactionFeedbackLearning — Story 6.6 orchestration (AC1/3/4/6)
+  // ========================================================================
+
+  describe("runSatisfactionFeedbackLearning", () => {
+    /** Helper to set up the select chain for ghost card + interaction lookups */
+    function setupGhostCardAndInteraction(
+      gcResult: Record<string, unknown>[] = [{ interactionId: "int-800" }],
+      intResult: Record<string, unknown>[] = [
+        {
+          outcome: "accepted",
+          reasoningSummary: "Consider waiting for a sale",
+          metadata: { purchaseContext: "buying headphones" },
+        },
+      ]
+    ) {
+      let selectCallCount = 0;
+      const selectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn(() => {
+          selectCallCount++;
+          if (selectCallCount === 1) {
+            return Promise.resolve(gcResult);
+          }
+          return Promise.resolve(intResult);
+        }),
+      };
+      mocks.mockDbSelect.mockReturnValue(selectChain);
+      return selectChain;
+    }
+
+    beforeEach(() => {
+      mocks.mockSatisfactionToFeedbackSignal.mockReturnValue(
+        "incorrect — user accepted but later regretted"
+      );
+    });
+
+    it("runs full pipeline: lookup -> signal -> Reflector -> SkillManager -> trace", async () => {
+      setupGhostCardAndInteraction();
+      setupSkillbookUpdateChain();
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      await _satLearning({
+        ghostCardId: "gc-100",
+        userId: "user-1",
+        satisfactionFeedback: "regret_it",
+      });
+
+      // Signal mapping called
+      expect(mocks.mockSatisfactionToFeedbackSignal).toHaveBeenCalledWith(
+        "regret_it",
+        "accepted"
+      );
+
+      // Reflector called with customFeedback
+      expect(mocks.mockReflect).toHaveBeenCalled();
+
+      // SkillManager curation called (verifies full pipeline completion)
+      expect(mocks.mockCurate).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
+    it("skips gracefully when ghost card not found", async () => {
+      setupGhostCardAndInteraction([]);
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      await _satLearning({
+        ghostCardId: "gc-missing",
+        userId: "user-1",
+        satisfactionFeedback: "worth_it",
+      });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[SatisfactionLearning]")
+      );
+      expect(mocks.mockReflect).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
+    it("skips gracefully when interaction not found", async () => {
+      setupGhostCardAndInteraction([{ interactionId: "int-800" }], []);
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      await _satLearning({
+        ghostCardId: "gc-101",
+        userId: "user-1",
+        satisfactionFeedback: "regret_it",
+      });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[SatisfactionLearning]")
+      );
+      expect(mocks.mockReflect).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
+    it("logs warning and does not throw on Reflector failure", async () => {
+      setupGhostCardAndInteraction();
+      mocks.reflectError = new Error("LLM API error");
+      mocks.mockReflect.mockImplementation(() => {
+        throw mocks.reflectError;
+      });
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      // Should NOT throw
+      await _satLearning({
+        ghostCardId: "gc-102",
+        userId: "user-1",
+        satisfactionFeedback: "worth_it",
+      });
+
+      // Learning warn logs exist (from runReflection's catch)
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[Learning]"),
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("logs warning on DB error and does not throw", async () => {
+      // Make select throw
+      const selectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn(() => Promise.reject(new Error("DB timeout"))),
+      };
+      mocks.mockDbSelect.mockReturnValue(selectChain);
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      // Should NOT throw
+      await _satLearning({
+        ghostCardId: "gc-103",
+        userId: "user-1",
+        satisfactionFeedback: "regret_it",
+      });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[SatisfactionLearning] Pipeline failed"),
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

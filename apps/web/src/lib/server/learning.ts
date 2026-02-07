@@ -2,7 +2,11 @@ import "server-only";
 
 import { google } from "@ai-sdk/google";
 import { db } from "@pause/db";
-import { interaction, skillbook as skillbookTable } from "@pause/db/schema";
+import {
+  ghostCard,
+  interaction,
+  skillbook as skillbookTable,
+} from "@pause/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import type { ReflectorOutput, UpdateBatch } from "@/lib/server/ace";
 import {
@@ -12,6 +16,7 @@ import {
   SkillManager,
   VercelAIClient,
 } from "@/lib/server/ace";
+import { satisfactionToFeedbackSignal } from "@/lib/server/ghost-cards";
 import { getOpikClient } from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
@@ -87,10 +92,19 @@ export async function runReflection(params: {
   question: string;
   generatorAnswer: string;
   outcome: string;
+  customFeedback?: string;
 }): Promise<LearningPipelineResult | null> {
-  const { interactionId, userId, question, generatorAnswer, outcome } = params;
+  const {
+    interactionId,
+    userId,
+    question,
+    generatorAnswer,
+    outcome,
+    customFeedback,
+  } = params;
 
   const feedbackSignal =
+    customFeedback ??
     feedbackSignalMap[outcome as keyof typeof feedbackSignalMap] ??
     `neutral — unknown outcome: ${outcome}`;
 
@@ -370,4 +384,157 @@ export async function markLearningComplete(
     .update(interaction)
     .set({ status: "learning_complete" })
     .where(eq(interaction.id, interactionId));
+}
+
+/**
+ * Creates a learning:satisfaction_feedback Opik trace (Story 6.6, AC4).
+ * Links to the parent guardian trace via interactionId for observability.
+ * Fire-and-forget — errors are logged but do not throw.
+ */
+export async function attachSatisfactionFeedbackToTrace(
+  interactionId: string,
+  metadata: {
+    satisfactionFeedback: string;
+    originalOutcome: string;
+    mappedSignal: string;
+    reflectionAnalysis: string;
+    newLearnings: unknown[];
+  }
+): Promise<void> {
+  try {
+    const client = getOpikClient();
+    if (!client) {
+      return;
+    }
+
+    const traces = await client.searchTraces({
+      filterString: `name = "guardian-${interactionId}"`,
+      waitForAtLeast: 1,
+      waitForTimeout: 5000,
+    });
+
+    if (traces.length === 0) {
+      return;
+    }
+
+    const learningTrace = client.trace({
+      name: "learning:satisfaction_feedback",
+      input: {
+        interactionId,
+        parentTraceId: traces[0].id,
+        ...metadata,
+      },
+    });
+    learningTrace.end();
+    await client.flush();
+  } catch {
+    // Telemetry failures must never disrupt the learning pipeline (AC4)
+  }
+}
+
+/**
+ * Runs the full satisfaction feedback learning pipeline (Story 6.6, AC1/3/4/6).
+ * Orchestrates: ghost card lookup -> interaction lookup -> signal mapping ->
+ * Reflector -> SkillManager -> trace attachment.
+ *
+ * MUST run inside after() — never blocks the PATCH response.
+ * NEVER throws — all errors are caught and logged with [SatisfactionLearning] prefix.
+ */
+export async function runSatisfactionFeedbackLearning(params: {
+  ghostCardId: string;
+  userId: string;
+  satisfactionFeedback: string;
+}): Promise<void> {
+  const { ghostCardId, userId, satisfactionFeedback } = params;
+
+  try {
+    // Step 1: Look up ghost card -> interactionId
+    const gcResult = await withTimeout(
+      db
+        .select({
+          interactionId: ghostCard.interactionId,
+        })
+        .from(ghostCard)
+        .where(eq(ghostCard.id, ghostCardId))
+        .limit(1),
+      DB_TIMEOUT_MS
+    );
+
+    const gc = gcResult[0];
+    if (!gc?.interactionId) {
+      console.warn(
+        `[SatisfactionLearning] Ghost card ${ghostCardId} not found or missing interactionId`
+      );
+      return;
+    }
+
+    // Step 2: Look up interaction for outcome + reasoning
+    const intResult = await withTimeout(
+      db
+        .select({
+          outcome: interaction.outcome,
+          reasoningSummary: interaction.reasoningSummary,
+          metadata: interaction.metadata,
+        })
+        .from(interaction)
+        .where(eq(interaction.id, gc.interactionId))
+        .limit(1),
+      DB_TIMEOUT_MS
+    );
+
+    const intRow = intResult[0];
+    if (!intRow?.outcome) {
+      console.warn(
+        `[SatisfactionLearning] Interaction ${gc.interactionId} not found or missing outcome`
+      );
+      return;
+    }
+
+    // Step 3: Map satisfaction + outcome to learning signal
+    const mappedSignal = satisfactionToFeedbackSignal(
+      satisfactionFeedback,
+      intRow.outcome
+    );
+
+    // Step 4: Extract context for reflection
+    const meta = (intRow.metadata ?? {}) as Record<string, unknown>;
+    const purchaseCtx =
+      typeof meta.purchaseContext === "string"
+        ? meta.purchaseContext
+        : "product purchase";
+
+    // Step 5: Run reflection with customFeedback
+    const reflectionResult = await runReflection({
+      interactionId: gc.interactionId,
+      userId,
+      question: purchaseCtx,
+      generatorAnswer: intRow.reasoningSummary ?? "",
+      outcome: intRow.outcome,
+      customFeedback: mappedSignal,
+    });
+
+    if (!reflectionResult) {
+      return;
+    }
+
+    // Step 6: Run SkillManager curation + persist
+    await runSkillUpdate(reflectionResult);
+
+    // Step 7: Trace attachment + status update (non-blocking)
+    await Promise.allSettled([
+      attachSatisfactionFeedbackToTrace(gc.interactionId, {
+        satisfactionFeedback,
+        originalOutcome: intRow.outcome,
+        mappedSignal,
+        reflectionAnalysis: reflectionResult.reflectionOutput.analysis,
+        newLearnings: reflectionResult.reflectionOutput.new_learnings,
+      }),
+      markLearningComplete(gc.interactionId),
+    ]);
+  } catch (error) {
+    console.warn(
+      `[SatisfactionLearning] Pipeline failed for ghost card ${ghostCardId}:`,
+      error
+    );
+  }
 }

@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => {
   const mockSelect = vi.fn();
   const mockUpdate = vi.fn();
   const mockUpdateSet = vi.fn();
+  const mockAfter = vi.fn();
+  const mockRunSatisfactionFeedbackLearning = vi.fn();
 
   return {
     session: null as { user: { id: string } } | null,
@@ -13,6 +15,8 @@ const mocks = vi.hoisted(() => {
     mockSelect,
     mockUpdate,
     mockUpdateSet,
+    mockAfter,
+    mockRunSatisfactionFeedbackLearning,
   };
 });
 
@@ -88,6 +92,16 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((a: unknown, b: unknown) => ({ eq: [a, b] })),
 }));
 
+// --- Mock next/server (after callback) ---
+vi.mock("next/server", () => ({
+  after: mocks.mockAfter,
+}));
+
+// --- Mock learning module (Story 6.6) ---
+vi.mock("@/lib/server/learning", () => ({
+  runSatisfactionFeedbackLearning: mocks.mockRunSatisfactionFeedbackLearning,
+}));
+
 // --- Import the route handler ---
 import { PATCH } from "./route";
 
@@ -112,6 +126,7 @@ describe("Ghost Cards PATCH Route", () => {
     mocks.session = { user: { id: "user-1" } };
     mocks.selectResult = [{ id: "gc-1", userId: "user-1" }];
     mocks.updateError = null;
+    mocks.mockRunSatisfactionFeedbackLearning.mockResolvedValue(undefined);
     setupSelectChain();
     setupUpdateChain();
   });
@@ -248,5 +263,104 @@ describe("Ghost Cards PATCH Route", () => {
     expect(response.status).toBe(500);
     const data = await response.json();
     expect(data).toEqual({ error: "Failed to update ghost card" });
+  });
+
+  // ========================================================================
+  // Learning Pipeline Trigger (Story 6.6, AC1/6/7)
+  // ========================================================================
+
+  it("calls after() with learning pipeline on successful update", async () => {
+    await PATCH(createPatchRequest({ satisfactionFeedback: "worth_it" }), {
+      params: createParams(),
+    });
+
+    expect(mocks.mockAfter).toHaveBeenCalledTimes(1);
+    expect(mocks.mockAfter).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it("passes correct params to runSatisfactionFeedbackLearning via after()", async () => {
+    await PATCH(createPatchRequest({ satisfactionFeedback: "regret_it" }), {
+      params: createParams("gc-42"),
+    });
+
+    // Execute the after() callback
+    const afterCallback = mocks.mockAfter.mock.calls[0][0];
+    await afterCallback();
+
+    expect(mocks.mockRunSatisfactionFeedbackLearning).toHaveBeenCalledWith({
+      ghostCardId: "gc-42",
+      userId: "user-1",
+      satisfactionFeedback: "regret_it",
+    });
+  });
+
+  it("returns 200 even when learning pipeline rejects (non-blocking AC6)", async () => {
+    mocks.mockRunSatisfactionFeedbackLearning.mockRejectedValue(
+      new Error("Learning failed")
+    );
+
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+      /* noop */
+    });
+
+    const response = await PATCH(
+      createPatchRequest({ satisfactionFeedback: "worth_it" }),
+      { params: createParams() }
+    );
+    expect(response.status).toBe(200);
+
+    // Execute the after() callback — should not throw
+    const afterCallback = mocks.mockAfter.mock.calls[0][0];
+    await afterCallback();
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[SatisfactionLearning]"),
+      expect.any(Error)
+    );
+
+    consoleSpy.mockRestore();
+  });
+
+  it("triggers learning for re-submission (Change button, AC7)", async () => {
+    // First submission
+    await PATCH(createPatchRequest({ satisfactionFeedback: "worth_it" }), {
+      params: createParams(),
+    });
+
+    // Second submission (change of mind)
+    await PATCH(createPatchRequest({ satisfactionFeedback: "regret_it" }), {
+      params: createParams(),
+    });
+
+    // after() should be called twice (once per PATCH)
+    expect(mocks.mockAfter).toHaveBeenCalledTimes(2);
+  });
+
+  it("triggers learning even for not_sure feedback (neutral signal)", async () => {
+    await PATCH(createPatchRequest({ satisfactionFeedback: "not_sure" }), {
+      params: createParams(),
+    });
+
+    expect(mocks.mockAfter).toHaveBeenCalledTimes(1);
+
+    // Execute and verify params
+    const afterCallback = mocks.mockAfter.mock.calls[0][0];
+    await afterCallback();
+
+    expect(mocks.mockRunSatisfactionFeedbackLearning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        satisfactionFeedback: "not_sure",
+      })
+    );
+  });
+
+  it("does not call after() when update fails", async () => {
+    mocks.updateError = new Error("DB failed");
+
+    await PATCH(createPatchRequest({ satisfactionFeedback: "worth_it" }), {
+      params: createParams(),
+    });
+
+    expect(mocks.mockAfter).not.toHaveBeenCalled();
   });
 });
