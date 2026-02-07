@@ -5,6 +5,8 @@ import { useEffect } from "react";
 
 import { RecentInteractions } from "@/components/dashboard/recent-interactions";
 import { SavingsSummary } from "@/components/dashboard/savings-summary";
+import { GhostCardFeed } from "@/components/guardian/ghost-card-feed";
+import { GhostCardManagerProvider } from "@/components/guardian/ghost-card-manager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/utils/trpc";
 
@@ -77,7 +79,9 @@ export default function Dashboard() {
         />
         <RecentInteractions interactions={data.recentInteractions} />
 
-        {/* Ghost card feed placeholder — Story 7.3 */}
+        <GhostCardManagerProvider>
+          <GhostCardFeed />
+        </GhostCardManagerProvider>
       </div>
     </div>
   );
