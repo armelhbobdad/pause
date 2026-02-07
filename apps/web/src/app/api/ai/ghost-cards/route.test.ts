@@ -66,6 +66,7 @@ vi.mock("@pause/db/schema", () => ({
     userId: "ghost_card.userId",
     interactionId: "ghost_card.interactionId",
     status: "ghost_card.status",
+    satisfactionFeedback: "ghost_card.satisfactionFeedback",
     createdAt: "ghost_card.createdAt",
   },
   interaction: {
@@ -128,6 +129,7 @@ describe("Ghost Cards API Route", () => {
         id: "gc-1",
         interactionId: "int-1",
         status: "pending",
+        satisfactionFeedback: null,
         createdAt: new Date("2026-02-07T12:00:00Z"),
         tier: "negotiator",
         outcome: "accepted",
@@ -150,6 +152,7 @@ describe("Ghost Cards API Route", () => {
       id: "gc-1",
       interactionId: "int-1",
       status: "pending",
+      satisfactionFeedback: null,
       createdAt: "2026-02-07T12:00:00.000Z",
       tier: "negotiator",
       outcome: "accepted",
@@ -186,6 +189,7 @@ describe("Ghost Cards API Route", () => {
         id: "gc-2",
         interactionId: "int-2",
         status: "viewed",
+        satisfactionFeedback: null,
         createdAt: new Date("2026-02-07T10:00:00Z"),
         tier: "therapist",
         outcome: "wait",
@@ -197,6 +201,7 @@ describe("Ghost Cards API Route", () => {
     const data = await response.json();
 
     expect(data.cards[0].purchaseContext).toBeNull();
+    expect(data.cards[0].satisfactionFeedback).toBeNull();
   });
 
   // ========================================================================

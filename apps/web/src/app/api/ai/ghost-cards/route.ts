@@ -43,6 +43,7 @@ export async function GET(req: Request) {
     id: string;
     interactionId: string;
     status: string;
+    satisfactionFeedback: string | null;
     createdAt: Date;
     tier: string;
     outcome: string | null;
@@ -55,6 +56,7 @@ export async function GET(req: Request) {
           id: ghostCard.id,
           interactionId: ghostCard.interactionId,
           status: ghostCard.status,
+          satisfactionFeedback: ghostCard.satisfactionFeedback,
           createdAt: ghostCard.createdAt,
           tier: interaction.tier,
           outcome: interaction.outcome,
@@ -90,6 +92,7 @@ export async function GET(req: Request) {
       id: row.id,
       interactionId: row.interactionId,
       status: row.status,
+      satisfactionFeedback: row.satisfactionFeedback ?? null,
       createdAt: row.createdAt.toISOString(),
       tier: row.tier,
       outcome: row.outcome,

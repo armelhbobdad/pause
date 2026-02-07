@@ -58,6 +58,13 @@ export const ghostCardStatusEnum = pgEnum("ghost_card_status", [
   "feedback_given",
 ]);
 
+/** Satisfaction feedback for ghost cards (Story 6.5 — FR26) */
+export const satisfactionFeedbackEnum = pgEnum("satisfaction_feedback", [
+  "worth_it",
+  "regret_it",
+  "not_sure",
+]);
+
 // ============================================================================
 // Skillbook Table (ADR-008: Optimistic Locking)
 // ============================================================================
@@ -170,6 +177,7 @@ export const ghostCard = pgTable(
       .unique()
       .references(() => interaction.id, { onDelete: "cascade" }),
     status: ghostCardStatusEnum("status").default("pending").notNull(),
+    satisfactionFeedback: satisfactionFeedbackEnum("satisfaction_feedback"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
