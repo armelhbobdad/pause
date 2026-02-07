@@ -1,0 +1,1 @@
+ALTER TYPE "public"."interaction_outcome" ADD VALUE 'wait';

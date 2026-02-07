@@ -179,6 +179,22 @@ function SavingsTicketContainer({
 }
 
 // ============================================================================
+// Shared wait-defer POST helper (used by both containers)
+// ============================================================================
+
+async function postWaitDefer(interactionId: string): Promise<void> {
+  const response = await fetch("/api/ai/guardian/wait-defer", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ interactionId }),
+  });
+  if (!response.ok) {
+    throw new Error("API call failed");
+  }
+  toast.success("Good call. Your card will be here when you're ready.");
+}
+
+// ============================================================================
 // ReflectionPromptContainer — stateful wrapper
 // ============================================================================
 
@@ -186,27 +202,46 @@ interface ReflectionPromptContainerProps {
   output: ReflectionPromptOutput;
   interactionId?: string | null;
   onRevealApproved?: () => void;
+  onWait?: () => void;
 }
 
 function ReflectionPromptContainer({
   output,
   interactionId,
   onRevealApproved,
+  onWait,
 }: ReflectionPromptContainerProps) {
   const [isOverridden, setIsOverridden] = useState(false);
+  const [isWaiting, setIsWaiting] = useState(false);
 
   const handleOverride = () => {
-    if (isOverridden) {
+    if (isOverridden || isWaiting) {
       return;
     }
     setIsOverridden(true);
     onRevealApproved?.();
   };
 
+  const handleWait = async () => {
+    if (isWaiting || isOverridden || !interactionId) {
+      return;
+    }
+    setIsWaiting(true);
+
+    try {
+      await postWaitDefer(interactionId);
+      onWait?.();
+    } catch {
+      toast.error("Something went wrong. Try again.", { duration: 4000 });
+      setIsWaiting(false);
+    }
+  };
+
   return (
     <ReflectionPrompt
-      disabled={!interactionId || isOverridden}
+      disabled={!interactionId || isOverridden || isWaiting}
       onOverride={handleOverride}
+      onWait={handleWait}
       output={output}
     />
   );
@@ -220,27 +255,46 @@ interface WaitCardContainerProps {
   output: WaitOptionOutput;
   interactionId?: string | null;
   onRevealApproved?: () => void;
+  onWait?: () => void;
 }
 
 function WaitCardContainer({
   output,
   interactionId,
   onRevealApproved,
+  onWait,
 }: WaitCardContainerProps) {
   const [isOverridden, setIsOverridden] = useState(false);
+  const [isWaiting, setIsWaiting] = useState(false);
 
   const handleOverride = () => {
-    if (isOverridden) {
+    if (isOverridden || isWaiting) {
       return;
     }
     setIsOverridden(true);
     onRevealApproved?.();
   };
 
+  const handleWait = async () => {
+    if (isWaiting || isOverridden || !interactionId) {
+      return;
+    }
+    setIsWaiting(true);
+
+    try {
+      await postWaitDefer(interactionId);
+      onWait?.();
+    } catch {
+      toast.error("Something went wrong. Try again.", { duration: 4000 });
+      setIsWaiting(false);
+    }
+  };
+
   return (
     <WaitCard
-      disabled={!interactionId || isOverridden}
+      disabled={!interactionId || isOverridden || isWaiting}
       onOverride={handleOverride}
+      onWait={handleWait}
       output={output}
     />
   );
@@ -254,12 +308,14 @@ export interface ToolPartsRendererProps {
   part: DynamicToolUIPart;
   interactionId?: string | null;
   onRevealApproved?: () => void;
+  onWait?: () => void;
 }
 
 export function ToolPartsRenderer({
   part,
   interactionId,
   onRevealApproved,
+  onWait,
 }: ToolPartsRendererProps) {
   const toolName = part.toolName as ToolName;
 
@@ -323,6 +379,7 @@ export function ToolPartsRenderer({
         <ReflectionPromptContainer
           interactionId={interactionId}
           onRevealApproved={onRevealApproved}
+          onWait={onWait}
           output={part.output}
         />
       );
@@ -339,6 +396,7 @@ export function ToolPartsRenderer({
         <WaitCardContainer
           interactionId={interactionId}
           onRevealApproved={onRevealApproved}
+          onWait={onWait}
           output={part.output}
         />
       );

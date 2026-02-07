@@ -59,12 +59,26 @@ describe("ReflectionPrompt", () => {
     expect(button).toBeDisabled();
   });
 
-  it('renders disabled "Wait & Reflect" placeholder button', () => {
+  it('"Wait & Reflect" button is enabled by default', () => {
     render(<ReflectionPrompt output={makeOutput()} />);
     const waitButton = screen.getByRole("button", { name: WAIT_RE });
     expect(waitButton).toBeInTheDocument();
+    expect(waitButton).toBeEnabled();
+  });
+
+  it('"Wait & Reflect" button calls onWait', async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+    render(<ReflectionPrompt onWait={mockWait} output={makeOutput()} />);
+
+    await user.click(screen.getByRole("button", { name: WAIT_RE }));
+    expect(mockWait).toHaveBeenCalledOnce();
+  });
+
+  it("disables Wait & Reflect button when disabled prop is true", () => {
+    render(<ReflectionPrompt disabled output={makeOutput()} />);
+    const waitButton = screen.getByRole("button", { name: WAIT_RE });
     expect(waitButton).toBeDisabled();
-    expect(waitButton).toHaveAttribute("title", "Coming soon");
   });
 
   // --- Story 5.2 AC3: max-height constraint ---

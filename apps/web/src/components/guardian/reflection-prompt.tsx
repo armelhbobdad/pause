@@ -3,14 +3,17 @@ import type { ReflectionPromptOutput } from "@/lib/guardian/types";
 export interface ReflectionPromptProps {
   output: ReflectionPromptOutput;
   onOverride?: () => void;
+  onWait?: () => void;
   disabled?: boolean;
 }
 
 function ActionButtons({
   onOverride,
+  onWait,
   disabled,
 }: {
   onOverride?: () => void;
+  onWait?: () => void;
   disabled?: boolean;
 }) {
   return (
@@ -23,7 +26,8 @@ function ActionButtons({
     >
       <button
         aria-label="Wait and reflect on this purchase"
-        disabled
+        disabled={disabled}
+        onClick={onWait}
         style={{
           flex: 1,
           minHeight: "44px",
@@ -34,10 +38,9 @@ function ActionButtons({
           color: "white",
           fontWeight: "bold",
           fontSize: "0.875rem",
-          cursor: "not-allowed",
-          opacity: 0.6,
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.6 : 1,
         }}
-        title="Coming soon"
         type="button"
       >
         Wait & Reflect
@@ -70,6 +73,7 @@ function ActionButtons({
 export function ReflectionPrompt({
   output,
   onOverride,
+  onWait,
   disabled,
 }: ReflectionPromptProps) {
   return (
@@ -110,7 +114,11 @@ export function ReflectionPrompt({
         {output.strategyName}
       </div>
 
-      <ActionButtons disabled={disabled} onOverride={onOverride} />
+      <ActionButtons
+        disabled={disabled}
+        onOverride={onOverride}
+        onWait={onWait}
+      />
     </output>
   );
 }

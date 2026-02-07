@@ -252,6 +252,7 @@ function CommandCenterInner({
       isStreaming={isStreaming}
       messages={messages}
       onRevealApproved={revealApproved}
+      onWait={relock}
     />
   );
 

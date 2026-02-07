@@ -97,6 +97,7 @@ vi.mock("@/components/guardian/reflection-prompt", () => ({
   ReflectionPrompt: ({
     output,
     onOverride,
+    onWait,
     disabled,
   }: {
     output: {
@@ -105,6 +106,7 @@ vi.mock("@/components/guardian/reflection-prompt", () => ({
       strategyName: string;
     };
     onOverride?: () => void;
+    onWait?: () => void;
     disabled?: boolean;
   }) => (
     <div data-disabled={disabled} data-testid="reflection-prompt">
@@ -118,6 +120,15 @@ vi.mock("@/components/guardian/reflection-prompt", () => ({
           Override
         </button>
       )}
+      {onWait && (
+        <button
+          data-testid="reflection-wait-button"
+          onClick={onWait}
+          type="button"
+        >
+          Wait
+        </button>
+      )}
     </div>
   ),
 }));
@@ -126,10 +137,12 @@ vi.mock("@/components/guardian/wait-card", () => ({
   WaitCard: ({
     output,
     onOverride,
+    onWait,
     disabled,
   }: {
     output: { durationHours: number; reasoning: string };
     onOverride?: () => void;
+    onWait?: () => void;
     disabled?: boolean;
   }) => (
     <div data-disabled={disabled} data-testid="wait-card">
@@ -141,6 +154,11 @@ vi.mock("@/components/guardian/wait-card", () => ({
           type="button"
         >
           Override
+        </button>
+      )}
+      {onWait && (
+        <button data-testid="wait-sleep-button" onClick={onWait} type="button">
+          Sleep
         </button>
       )}
     </div>
@@ -1125,5 +1143,283 @@ describe("isWaitOption", () => {
     expect(isWaitOption({ durationHours: "24", reasoning: "test" })).toBe(
       false
     );
+  });
+});
+
+// ============================================================================
+// WaitCardContainer — Wait flow (Story 5.3)
+// ============================================================================
+
+describe("WaitCardContainer wait flow (via ToolPartsRenderer)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it("WaitCardContainer posts to wait-defer endpoint on wait click", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { durationHours: 24, reasoning: "Sleeping on it helps" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("wait-sleep-button"));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/wait-defer",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ interactionId: "int-123" }),
+        })
+      );
+    });
+  });
+
+  it("WaitCardContainer calls onWait callback after successful POST", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { durationHours: 24, reasoning: "Sleeping on it helps" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("wait-sleep-button"));
+
+    await waitFor(() => {
+      expect(mockWait).toHaveBeenCalled();
+    });
+  });
+
+  it("WaitCardContainer shows success toast after wait", async () => {
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { durationHours: 24, reasoning: "Sleeping on it helps" },
+    });
+
+    render(
+      <ToolPartsRenderer interactionId="int-123" onWait={vi.fn()} part={part} />
+    );
+
+    await user.click(screen.getByTestId("wait-sleep-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastSuccess).toHaveBeenCalledWith(
+        "Good call. Your card will be here when you're ready."
+      );
+    });
+  });
+
+  it("WaitCardContainer shows error toast on API failure and does NOT call onWait", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "fail" }), { status: 500 })
+    );
+
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { durationHours: 24, reasoning: "Sleeping on it helps" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("wait-sleep-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Something went wrong. Try again.",
+        expect.objectContaining({ duration: 4000 })
+      );
+    });
+
+    expect(mockWait).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// ReflectionPromptContainer — Wait flow (Story 5.3)
+// ============================================================================
+
+describe("ReflectionPromptContainer wait flow (via ToolPartsRenderer)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it("ReflectionPromptContainer posts to wait-defer endpoint on wait click", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("reflection-wait-button"));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/wait-defer",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ interactionId: "int-123" }),
+        })
+      );
+    });
+  });
+
+  it("ReflectionPromptContainer calls onWait callback after successful POST", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("reflection-wait-button"));
+
+    await waitFor(() => {
+      expect(mockWait).toHaveBeenCalled();
+    });
+  });
+
+  it("ReflectionPromptContainer shows success toast after wait", async () => {
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    render(
+      <ToolPartsRenderer interactionId="int-123" onWait={vi.fn()} part={part} />
+    );
+
+    await user.click(screen.getByTestId("reflection-wait-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastSuccess).toHaveBeenCalledWith(
+        "Good call. Your card will be here when you're ready."
+      );
+    });
+  });
+
+  it("ReflectionPromptContainer shows error toast on API failure and does NOT call onWait", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "fail" }), { status: 500 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("reflection-wait-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Something went wrong. Try again.",
+        expect.objectContaining({ duration: 4000 })
+      );
+    });
+
+    expect(mockWait).not.toHaveBeenCalled();
   });
 });

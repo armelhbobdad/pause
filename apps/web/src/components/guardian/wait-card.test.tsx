@@ -21,10 +21,25 @@ describe("WaitCard", () => {
     ).toBeInTheDocument();
   });
 
-  it('renders "Sleep on it" button (disabled)', () => {
+  it('"Sleep on it" button is enabled by default', () => {
     render(<WaitCard output={makeOutput()} />);
     const sleepButton = screen.getByRole("button", { name: SLEEP_RE });
     expect(sleepButton).toBeInTheDocument();
+    expect(sleepButton).toBeEnabled();
+  });
+
+  it('"Sleep on it" button calls onWait', async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+    render(<WaitCard onWait={mockWait} output={makeOutput()} />);
+
+    await user.click(screen.getByRole("button", { name: SLEEP_RE }));
+    expect(mockWait).toHaveBeenCalledOnce();
+  });
+
+  it("disables Sleep on it button when disabled prop is true", () => {
+    render(<WaitCard disabled output={makeOutput()} />);
+    const sleepButton = screen.getByRole("button", { name: SLEEP_RE });
     expect(sleepButton).toBeDisabled();
   });
 

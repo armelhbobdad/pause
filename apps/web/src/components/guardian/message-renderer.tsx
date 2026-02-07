@@ -14,6 +14,7 @@ export interface MessageRendererProps {
   guardianContent?: ReactNode;
   interactionId?: string | null;
   onRevealApproved?: () => void;
+  onWait?: () => void;
 }
 
 export function MessageRenderer({
@@ -22,6 +23,7 @@ export function MessageRenderer({
   guardianContent,
   interactionId,
   onRevealApproved,
+  onWait,
 }: MessageRendererProps) {
   const assistantMessages = messages.filter((m) => m.role === "assistant");
 
@@ -60,6 +62,7 @@ export function MessageRenderer({
                   <ToolPartsRenderer
                     interactionId={interactionId}
                     onRevealApproved={onRevealApproved}
+                    onWait={onWait}
                     part={dynamicPart}
                   />
                 </div>

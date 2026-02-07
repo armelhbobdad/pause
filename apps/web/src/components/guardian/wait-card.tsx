@@ -3,14 +3,17 @@ import type { WaitOptionOutput } from "@/lib/guardian/types";
 export interface WaitCardProps {
   output: WaitOptionOutput;
   onOverride?: () => void;
+  onWait?: () => void;
   disabled?: boolean;
 }
 
 function ActionButtons({
   onOverride,
+  onWait,
   disabled,
 }: {
   onOverride?: () => void;
+  onWait?: () => void;
   disabled?: boolean;
 }) {
   return (
@@ -23,7 +26,8 @@ function ActionButtons({
     >
       <button
         aria-label="Sleep on this purchase decision"
-        disabled
+        disabled={disabled}
+        onClick={onWait}
         style={{
           flex: 1,
           minHeight: "44px",
@@ -34,10 +38,9 @@ function ActionButtons({
           color: "white",
           fontWeight: "bold",
           fontSize: "0.875rem",
-          cursor: "not-allowed",
-          opacity: 0.6,
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.6 : 1,
         }}
-        title="Coming soon"
         type="button"
       >
         Sleep on it
@@ -67,7 +70,12 @@ function ActionButtons({
   );
 }
 
-export function WaitCard({ output, onOverride, disabled }: WaitCardProps) {
+export function WaitCard({
+  output,
+  onOverride,
+  onWait,
+  disabled,
+}: WaitCardProps) {
   return (
     <output
       aria-label="Wait option"
@@ -93,7 +101,11 @@ export function WaitCard({ output, onOverride, disabled }: WaitCardProps) {
         {output.reasoning}
       </div>
 
-      <ActionButtons disabled={disabled} onOverride={onOverride} />
+      <ActionButtons
+        disabled={disabled}
+        onOverride={onOverride}
+        onWait={onWait}
+      />
     </output>
   );
 }
