@@ -87,3 +87,40 @@
   --font-data:
     var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
 }
+
+/* Shimmer Loading Animation (Story 4.4, AC#5)
+   Sliding gradient for tool-call loading state */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Breath Beat Entry Animation (Story 4.4, UX-53)
+   200ms delay before tool component appears — fade-in with slight rise */
+@keyframes breath-beat-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Savings Ticket Entry Animation (Story 4.3, UX-53, UX-04)
+   translateY(-12px) → 0 slide-up with fade-in over 800ms using --ease-out-expo */
+@keyframes savings-ticket-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

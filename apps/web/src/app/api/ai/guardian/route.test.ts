@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
   const mockInsert = vi.fn();
   const mockUpdate = vi.fn();
   const mockAfter = vi.fn();
+  const mockSearchCoupons = vi.fn();
 
   return {
     session: null as { user: { id: string } } | null,
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => {
     mockInsert,
     mockUpdate,
     mockAfter,
+    mockSearchCoupons,
   };
 });
 
@@ -104,6 +106,31 @@ vi.mock("ai", () => ({
     return mocks.streamResult;
   }),
   stepCountIs: vi.fn((n: number) => ({ type: "stepCount", count: n })),
+  tool: vi.fn((def: unknown) => def),
+}));
+
+// --- Mock tool-names (shared type) ---
+vi.mock("@/lib/guardian/tool-names", () => ({
+  TOOL_NAMES: {
+    SEARCH_COUPONS: "search_coupons",
+    PRESENT_REFLECTION: "present_reflection",
+    SHOW_WAIT_OPTION: "show_wait_option",
+  },
+}));
+
+// --- Mock coupon search tool ---
+vi.mock("@/lib/server/guardian/tools/coupon-search", () => ({
+  searchCouponsTool: {
+    description:
+      "Search for applicable deals, coupons, or promo codes for a purchase",
+    inputSchema: {},
+    execute: mocks.mockSearchCoupons,
+  },
+}));
+
+// --- Mock coupon provider ---
+vi.mock("@/lib/server/guardian/tools/coupon-provider", () => ({
+  searchCoupons: mocks.mockSearchCoupons,
 }));
 
 vi.mock("@ai-sdk/google", () => ({
@@ -1182,6 +1209,109 @@ describe("Guardian Route Handler", () => {
         createRequest({ ...validBody, purchaseContext: maxContext })
       );
       expect(response.status).toBe(200);
+    });
+  });
+
+  // ========================================================================
+  // Coupon Search Tool (Story 4.1)
+  // ========================================================================
+
+  describe("coupon search tool (Story 4.1)", () => {
+    // Test 6.5: prepareStep returns activeTools containing "search_coupons" for negotiator
+    it("prepareStep returns activeTools with search_coupons when tier is negotiator", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      const call = vi.mocked(streamText).mock.calls[0]?.[0];
+      const prepareStep = call?.prepareStep as
+        | (() => Record<string, unknown>)
+        | undefined;
+      expect(prepareStep).toBeDefined();
+      const stepResult = prepareStep?.();
+      expect(stepResult).toEqual({
+        toolCallStreaming: true,
+        activeTools: ["search_coupons"],
+      });
+    });
+
+    // Test 6.6: prepareStep returns empty object for analyst
+    it("prepareStep returns empty object when tier is analyst", async () => {
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      const call = vi.mocked(streamText).mock.calls[0]?.[0];
+      const prepareStep = call?.prepareStep as
+        | (() => Record<string, unknown>)
+        | undefined;
+      expect(prepareStep).toBeDefined();
+      const stepResult = prepareStep?.();
+      expect(stepResult).toEqual({});
+    });
+
+    // Test 6.7: prepareStep returns empty object for therapist
+    it("prepareStep returns empty object when tier is therapist", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 80,
+        factors: [],
+        reasoning: "test-therapist",
+        historyAvailable: true,
+      });
+
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      const call = vi.mocked(streamText).mock.calls[0]?.[0];
+      const prepareStep = call?.prepareStep as
+        | (() => Record<string, unknown>)
+        | undefined;
+      expect(prepareStep).toBeDefined();
+      const stepResult = prepareStep?.();
+      expect(stepResult).toEqual({});
+    });
+
+    // Test: streamText receives tools parameter with search_coupons
+    it("streamText receives tools parameter with search_coupons tool", async () => {
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: expect.objectContaining({
+            search_coupons: expect.objectContaining({
+              description: expect.any(String),
+            }),
+          }),
+        })
+      );
+    });
+
+    // Test 6.9: ToolName type includes "search_coupons" (compile-time check)
+    it("TOOL_NAMES.SEARCH_COUPONS equals 'search_coupons'", async () => {
+      const { TOOL_NAMES } = await import("@/lib/guardian/tool-names");
+      expect(TOOL_NAMES.SEARCH_COUPONS).toBe("search_coupons");
+    });
+
+    // Test: negotiator tier uses stepCountIs(5) (not auto-approved)
+    it("negotiator tier uses stepCountIs(5) allowing multi-step tool loop", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+      const { stepCountIs } = await import("ai");
+      await POST(createRequest(validBody));
+      expect(stepCountIs).toHaveBeenCalledWith(5);
     });
   });
 });

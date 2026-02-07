@@ -13,6 +13,7 @@ import {
 } from "@/components/guardian/guardian-conversation";
 import { GuardianErrorBoundary } from "@/components/guardian/guardian-error-boundary";
 import { GuardianErrorFallback } from "@/components/guardian/guardian-error-fallback";
+import { MessageRenderer } from "@/components/guardian/message-renderer";
 import { useGuardianState } from "@/hooks/use-guardian-state";
 import { useStreamTimeout } from "@/hooks/use-stream-timeout";
 
@@ -119,6 +120,7 @@ function CommandCenterInner({
   const autoApprovedRef = useRef(false);
   const breakGlassRef = useRef(false);
   const degradedRef = useRef(false);
+  const interactionIdRef = useRef<string | null>(null);
 
   // --- useChat integration (Story 3.1, AC#18) ---
   // React Compiler memoizes the transport instance based on cardId stability.
@@ -135,6 +137,7 @@ function CommandCenterInner({
           response.headers.get("x-guardian-break-glass") === "true";
         degradedRef.current =
           response.headers.get("x-guardian-degraded") === "true";
+        interactionIdRef.current = response.headers.get("x-interaction-id");
         return response;
       },
     }),
@@ -234,27 +237,8 @@ function CommandCenterInner({
   // Show error fallback while in break glass AND not yet dismissed
   const showErrorFallback = isBreakGlass && !errorDismissed;
 
-  // Render streaming messages from useChat as conversation content.
-  // UIMessage uses parts array (not content string) in Vercel AI SDK v6.
-  const streamingContent =
-    messages.length > 0 ? (
-      <div>
-        {messages
-          .filter((m) => m.role === "assistant")
-          .map((m) => (
-            <p key={m.id}>
-              {m.parts
-                ?.filter((part) => part.type === "text")
-                .map((part) => ("text" in part ? part.text : ""))}
-            </p>
-          ))}
-      </div>
-    ) : (
-      guardianContent
-    );
-
   // Content for the conversation area: show error fallback during break glass,
-  // otherwise show streaming content or normal guardian content.
+  // otherwise delegate to MessageRenderer for text + tool parts (Story 4.4).
   // GUARDIAN_ERROR auto-reveals the card (Default-to-Unlock principle per NFR-R1).
   const conversationContent = showErrorFallback ? (
     <GuardianErrorFallback
@@ -262,7 +246,13 @@ function CommandCenterInner({
       onManualUnlock={() => setErrorDismissed(true)}
     />
   ) : (
-    streamingContent
+    <MessageRenderer
+      guardianContent={guardianContent}
+      interactionId={interactionIdRef.current}
+      isStreaming={isStreaming}
+      messages={messages}
+      onRevealApproved={revealApproved}
+    />
   );
 
   return (
