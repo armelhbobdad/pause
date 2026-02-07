@@ -66,4 +66,11 @@ describe("THERAPIST_SYSTEM_PROMPT", () => {
   it("includes Tool Output Format section", () => {
     expect(THERAPIST_SYSTEM_PROMPT).toContain("Tool Output Format");
   });
+
+  // --- Story 5.2 AC8: prompt minimality after tool call ---
+  it("instructs LLM to produce minimal/empty text after calling both tools (AC8)", () => {
+    expect(THERAPIST_SYSTEM_PROMPT).toContain(
+      "minimal or empty after calling both tools"
+    );
+  });
 });

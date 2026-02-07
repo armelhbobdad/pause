@@ -71,11 +71,14 @@ export function WaitCard({ output, onOverride, disabled }: WaitCardProps) {
   return (
     <output
       aria-label="Wait option"
+      aria-live="polite"
       style={{
         display: "block",
         backgroundColor: "var(--therapist-amber-subtle)",
         borderRadius: "0.5rem",
         padding: "0.75rem 1rem",
+        maxHeight: "350px",
+        overflowY: "auto",
         animation: "savings-ticket-enter 800ms var(--ease-out-expo) both",
       }}
     >

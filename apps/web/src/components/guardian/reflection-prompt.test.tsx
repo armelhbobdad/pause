@@ -66,4 +66,40 @@ describe("ReflectionPrompt", () => {
     expect(waitButton).toBeDisabled();
     expect(waitButton).toHaveAttribute("title", "Coming soon");
   });
+
+  // --- Story 5.2 AC3: max-height constraint ---
+  it("enforces max-height: 350px and overflow-y: auto on output wrapper (AC3)", () => {
+    render(<ReflectionPrompt output={makeOutput()} />);
+    const output = screen.getByRole("status");
+    expect(output.style.maxHeight).toBe("350px");
+    expect(output.style.overflowY).toBe("auto");
+  });
+
+  // --- Story 5.2 AC4: amber color on border ---
+  it("uses --therapist-amber on border-left (AC4)", () => {
+    render(<ReflectionPrompt output={makeOutput()} />);
+    const output = screen.getByRole("status");
+    // happy-dom decomposes shorthand borderLeft into individual properties
+    expect(output.style.borderLeftColor).toBe("var(--therapist-amber)");
+  });
+
+  // --- Story 5.2 AC4: amber-subtle background ---
+  it("uses --therapist-amber-subtle for background (AC4)", () => {
+    render(<ReflectionPrompt output={makeOutput()} />);
+    const output = screen.getByRole("status");
+    expect(output.style.backgroundColor).toBe("var(--therapist-amber-subtle)");
+  });
+
+  // --- Story 5.2 AC5: exact button aria-labels ---
+  it('has aria-label="Wait and reflect on this purchase" on wait button (AC5)', () => {
+    render(<ReflectionPrompt output={makeOutput()} />);
+    expect(
+      screen.getByLabelText("Wait and reflect on this purchase")
+    ).toBeInTheDocument();
+  });
+
+  it('has aria-label="Unlock card anyway" on unlock button (AC5)', () => {
+    render(<ReflectionPrompt output={makeOutput()} />);
+    expect(screen.getByLabelText("Unlock card anyway")).toBeInTheDocument();
+  });
 });

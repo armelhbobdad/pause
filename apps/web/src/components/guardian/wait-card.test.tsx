@@ -41,11 +41,33 @@ describe("WaitCard", () => {
     render(<WaitCard output={makeOutput()} />);
     const output = screen.getByRole("status");
     expect(output).toHaveAttribute("aria-label", "Wait option");
+    expect(output).toHaveAttribute("aria-live", "polite");
   });
 
   it("disables Unlock Anyway button when disabled prop is true", () => {
     render(<WaitCard disabled output={makeOutput()} />);
     const unlockButton = screen.getByRole("button", { name: UNLOCK_RE });
     expect(unlockButton).toBeDisabled();
+  });
+
+  // --- Story 5.2 AC3: max-height constraint ---
+  it("enforces max-height: 350px and overflow-y: auto on output wrapper (AC3)", () => {
+    render(<WaitCard output={makeOutput()} />);
+    const output = screen.getByRole("status");
+    expect(output.style.maxHeight).toBe("350px");
+    expect(output.style.overflowY).toBe("auto");
+  });
+
+  // --- Story 5.2 AC5: exact button aria-labels ---
+  it('has aria-label="Sleep on this purchase decision" on sleep button (AC5)', () => {
+    render(<WaitCard output={makeOutput()} />);
+    expect(
+      screen.getByLabelText("Sleep on this purchase decision")
+    ).toBeInTheDocument();
+  });
+
+  it('has aria-label="Unlock card anyway" on unlock button (AC5)', () => {
+    render(<WaitCard output={makeOutput()} />);
+    expect(screen.getByLabelText("Unlock card anyway")).toBeInTheDocument();
   });
 });

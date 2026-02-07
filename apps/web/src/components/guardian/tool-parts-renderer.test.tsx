@@ -348,6 +348,46 @@ describe("ToolPartsRenderer", () => {
     expect(container.querySelector("[data-tool-loading]")).toBeInTheDocument();
   });
 
+  // --- Story 5.2 AC6: shimmer has aria-label for accessibility ---
+  it('shimmer loading state has aria-label="Loading tool result" (AC6)', () => {
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      state: "input-available",
+    });
+
+    render(<ToolPartsRenderer part={part} />);
+    expect(screen.getByLabelText("Loading tool result")).toBeInTheDocument();
+  });
+
+  it("shimmer has data-tool-loading attribute for CSS targeting (AC6)", () => {
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      state: "input-streaming",
+    });
+
+    const { container } = render(<ToolPartsRenderer part={part} />);
+    const loader = container.querySelector("[data-tool-loading]");
+    expect(loader).toBeInTheDocument();
+    expect(loader).toHaveAttribute("aria-label", "Loading tool result");
+  });
+
+  it("output-available state renders correct component, not shimmer (AC6)", () => {
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    const { container } = render(<ToolPartsRenderer part={part} />);
+    expect(
+      container.querySelector("[data-tool-loading]")
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("reflection-prompt")).toBeInTheDocument();
+  });
+
   // AC#6: Invalid result data handling
   it("renders fallback for malformed search_coupons result", () => {
     const part = makeToolPart({
