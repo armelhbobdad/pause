@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import type { DynamicToolUIPart, UIMessage } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MessageRenderer } from "./message-renderer";
-import { isBestOffer, ToolPartsRenderer } from "./tool-parts-renderer";
+import {
+  isBestOffer,
+  isReflectionPrompt,
+  isWaitOption,
+  ToolPartsRenderer,
+} from "./tool-parts-renderer";
 
 // ============================================================================
 // Hoisted mocks
@@ -88,6 +93,60 @@ vi.mock("streamdown", () => ({
   ),
 }));
 
+vi.mock("@/components/guardian/reflection-prompt", () => ({
+  ReflectionPrompt: ({
+    output,
+    onOverride,
+    disabled,
+  }: {
+    output: {
+      strategyId: string;
+      reflectionPrompt: string;
+      strategyName: string;
+    };
+    onOverride?: () => void;
+    disabled?: boolean;
+  }) => (
+    <div data-disabled={disabled} data-testid="reflection-prompt">
+      {output.reflectionPrompt}:{output.strategyName}
+      {onOverride && (
+        <button
+          data-testid="override-button"
+          onClick={onOverride}
+          type="button"
+        >
+          Override
+        </button>
+      )}
+    </div>
+  ),
+}));
+
+vi.mock("@/components/guardian/wait-card", () => ({
+  WaitCard: ({
+    output,
+    onOverride,
+    disabled,
+  }: {
+    output: { durationHours: number; reasoning: string };
+    onOverride?: () => void;
+    disabled?: boolean;
+  }) => (
+    <div data-disabled={disabled} data-testid="wait-card">
+      {output.reasoning}:{output.durationHours}h
+      {onOverride && (
+        <button
+          data-testid="wait-override-button"
+          onClick={onOverride}
+          type="button"
+        >
+          Override
+        </button>
+      )}
+    </div>
+  ),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: mocks.toastSuccess,
@@ -158,24 +217,55 @@ describe("ToolPartsRenderer", () => {
     );
   });
 
-  it("renders placeholder for present_reflection", () => {
+  it("renders ReflectionPromptContainer for present_reflection tool", () => {
     const part = makeToolPart({
       toolName: "present_reflection",
-      output: {},
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
     });
 
     render(<ToolPartsRenderer part={part} />);
-    expect(screen.getByText("Reflection prompt (Epic 5)")).toBeInTheDocument();
+    expect(screen.getByTestId("reflection-prompt")).toHaveTextContent(
+      "What would tomorrow-you think?:Future-Self Visualization"
+    );
   });
 
-  it("renders placeholder for show_wait_option", () => {
+  it("renders WaitCardContainer for show_wait_option tool", () => {
     const part = makeToolPart({
       toolName: "show_wait_option",
-      output: {},
+      output: {
+        durationHours: 24,
+        reasoning: "Sleeping on it helps",
+      },
     });
 
     render(<ToolPartsRenderer part={part} />);
-    expect(screen.getByText("Wait option (Epic 5)")).toBeInTheDocument();
+    expect(screen.getByTestId("wait-card")).toHaveTextContent(
+      "Sleeping on it helps:24h"
+    );
+  });
+
+  it("renders fallback when reflection output is invalid shape", () => {
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: { invalid: true },
+    });
+
+    render(<ToolPartsRenderer part={part} />);
+    expect(screen.getByText("Reflection data unavailable")).toBeInTheDocument();
+  });
+
+  it("renders fallback when wait output is invalid shape", () => {
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { invalid: true },
+    });
+
+    render(<ToolPartsRenderer part={part} />);
+    expect(screen.getByText("Wait option unavailable")).toBeInTheDocument();
   });
 
   // AC#5: Null/loading states
@@ -924,5 +1014,76 @@ describe("SavingsTicketContainer skip flow (via ToolPartsRenderer)", () => {
         "true"
       );
     });
+  });
+});
+
+// ============================================================================
+// isReflectionPrompt type guard (Story 5.1)
+// ============================================================================
+
+describe("isReflectionPrompt", () => {
+  it("returns true for valid ReflectionPromptOutput shape", () => {
+    expect(
+      isReflectionPrompt({
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      })
+    ).toBe(true);
+  });
+
+  it("returns false for null", () => {
+    expect(isReflectionPrompt(null)).toBe(false);
+  });
+
+  it("returns false for non-object", () => {
+    expect(isReflectionPrompt("string")).toBe(false);
+  });
+
+  it("returns false for missing required fields", () => {
+    expect(isReflectionPrompt({ strategyId: "future_self" })).toBe(false);
+  });
+
+  it("returns false when reflectionPrompt is not a string", () => {
+    expect(
+      isReflectionPrompt({
+        strategyId: "future_self",
+        reflectionPrompt: 42,
+        strategyName: "Test",
+      })
+    ).toBe(false);
+  });
+});
+
+// ============================================================================
+// isWaitOption type guard (Story 5.1)
+// ============================================================================
+
+describe("isWaitOption", () => {
+  it("returns true for valid WaitOptionOutput shape", () => {
+    expect(
+      isWaitOption({
+        durationHours: 24,
+        reasoning: "Sleeping on it helps",
+      })
+    ).toBe(true);
+  });
+
+  it("returns false for null", () => {
+    expect(isWaitOption(null)).toBe(false);
+  });
+
+  it("returns false for non-object", () => {
+    expect(isWaitOption(123)).toBe(false);
+  });
+
+  it("returns false for missing durationHours", () => {
+    expect(isWaitOption({ reasoning: "test" })).toBe(false);
+  });
+
+  it("returns false when durationHours is not a number", () => {
+    expect(isWaitOption({ durationHours: "24", reasoning: "test" })).toBe(
+      false
+    );
   });
 });

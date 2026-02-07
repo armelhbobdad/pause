@@ -93,3 +93,22 @@ export interface BestOffer {
   expiresAt: string | null;
   selectionReasoning: string;
 }
+
+// ============================================================================
+// Reflection Prompt Output (Therapist Tier — Story 5.1)
+// ============================================================================
+
+export interface ReflectionPromptOutput {
+  strategyId: string;
+  reflectionPrompt: string;
+  strategyName: string;
+}
+
+// ============================================================================
+// Wait Option Output (Therapist Tier — Story 5.1)
+// ============================================================================
+
+export interface WaitOptionOutput {
+  durationHours: number;
+  reasoning: string;
+}

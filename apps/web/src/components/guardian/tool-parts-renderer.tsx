@@ -3,14 +3,20 @@
 import type { DynamicToolUIPart } from "ai";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ReflectionPrompt } from "@/components/guardian/reflection-prompt";
 import { SavingsTicket } from "@/components/guardian/savings-ticket";
+import { WaitCard } from "@/components/guardian/wait-card";
 import type { ToolName } from "@/lib/guardian/tool-names";
 import { TOOL_NAMES } from "@/lib/guardian/tool-names";
-import type { BestOffer } from "@/lib/guardian/types";
+import type {
+  BestOffer,
+  ReflectionPromptOutput,
+  WaitOptionOutput,
+} from "@/lib/guardian/types";
 import { assertNever } from "@/lib/utils/assert-never";
 
 // ============================================================================
-// Type Guard
+// Type Guards
 // ============================================================================
 
 /** Runtime validation that a value has the BestOffer shape. */
@@ -25,6 +31,32 @@ export function isBestOffer(value: unknown): value is BestOffer {
     typeof obj.type === "string" &&
     typeof obj.discountCents === "number" &&
     typeof obj.source === "string"
+  );
+}
+
+/** Runtime validation that a value has the ReflectionPromptOutput shape. */
+export function isReflectionPrompt(
+  value: unknown
+): value is ReflectionPromptOutput {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.strategyId === "string" &&
+    typeof obj.reflectionPrompt === "string" &&
+    typeof obj.strategyName === "string"
+  );
+}
+
+/** Runtime validation that a value has the WaitOptionOutput shape. */
+export function isWaitOption(value: unknown): value is WaitOptionOutput {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.durationHours === "number" && typeof obj.reasoning === "string"
   );
 }
 
@@ -147,6 +179,74 @@ function SavingsTicketContainer({
 }
 
 // ============================================================================
+// ReflectionPromptContainer — stateful wrapper
+// ============================================================================
+
+interface ReflectionPromptContainerProps {
+  output: ReflectionPromptOutput;
+  interactionId?: string | null;
+  onRevealApproved?: () => void;
+}
+
+function ReflectionPromptContainer({
+  output,
+  interactionId,
+  onRevealApproved,
+}: ReflectionPromptContainerProps) {
+  const [isOverridden, setIsOverridden] = useState(false);
+
+  const handleOverride = () => {
+    if (isOverridden) {
+      return;
+    }
+    setIsOverridden(true);
+    onRevealApproved?.();
+  };
+
+  return (
+    <ReflectionPrompt
+      disabled={!interactionId || isOverridden}
+      onOverride={handleOverride}
+      output={output}
+    />
+  );
+}
+
+// ============================================================================
+// WaitCardContainer — stateful wrapper
+// ============================================================================
+
+interface WaitCardContainerProps {
+  output: WaitOptionOutput;
+  interactionId?: string | null;
+  onRevealApproved?: () => void;
+}
+
+function WaitCardContainer({
+  output,
+  interactionId,
+  onRevealApproved,
+}: WaitCardContainerProps) {
+  const [isOverridden, setIsOverridden] = useState(false);
+
+  const handleOverride = () => {
+    if (isOverridden) {
+      return;
+    }
+    setIsOverridden(true);
+    onRevealApproved?.();
+  };
+
+  return (
+    <WaitCard
+      disabled={!interactionId || isOverridden}
+      onOverride={handleOverride}
+      output={output}
+    />
+  );
+}
+
+// ============================================================================
 // ToolPartsRenderer
 // ============================================================================
 
@@ -211,16 +311,38 @@ export function ToolPartsRenderer({
         />
       );
     }
-    case TOOL_NAMES.PRESENT_REFLECTION:
+    case TOOL_NAMES.PRESENT_REFLECTION: {
+      if (!isReflectionPrompt(part.output)) {
+        return (
+          <div data-tool-fallback="present_reflection">
+            Reflection data unavailable
+          </div>
+        );
+      }
       return (
-        <div data-tool-placeholder="present_reflection">
-          Reflection prompt (Epic 5)
-        </div>
+        <ReflectionPromptContainer
+          interactionId={interactionId}
+          onRevealApproved={onRevealApproved}
+          output={part.output}
+        />
       );
-    case TOOL_NAMES.SHOW_WAIT_OPTION:
+    }
+    case TOOL_NAMES.SHOW_WAIT_OPTION: {
+      if (!isWaitOption(part.output)) {
+        return (
+          <div data-tool-fallback="show_wait_option">
+            Wait option unavailable
+          </div>
+        );
+      }
       return (
-        <div data-tool-placeholder="show_wait_option">Wait option (Epic 5)</div>
+        <WaitCardContainer
+          interactionId={interactionId}
+          onRevealApproved={onRevealApproved}
+          output={part.output}
+        />
       );
+    }
     default:
       return assertNever(toolName);
   }

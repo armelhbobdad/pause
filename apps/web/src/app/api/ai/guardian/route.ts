@@ -23,6 +23,8 @@ import {
   type InteractionTier,
 } from "@/lib/server/guardian/tiers";
 import { searchCouponsTool } from "@/lib/server/guardian/tools/coupon-search";
+import { presentReflectionTool } from "@/lib/server/guardian/tools/reflection-prompt";
+import { showWaitOptionTool } from "@/lib/server/guardian/tools/wait-option";
 import { getGuardianTelemetry, logDegradationTrace } from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
@@ -180,6 +182,8 @@ export async function POST(req: Request) {
       messages: modelMessages,
       tools: {
         [TOOL_NAMES.SEARCH_COUPONS]: searchCouponsTool,
+        [TOOL_NAMES.PRESENT_REFLECTION]: presentReflectionTool,
+        [TOOL_NAMES.SHOW_WAIT_OPTION]: showWaitOptionTool,
       },
       prepareStep: () => {
         if (tier === "negotiator") {
@@ -188,7 +192,15 @@ export async function POST(req: Request) {
             activeTools: [TOOL_NAMES.SEARCH_COUPONS],
           };
         }
-        // Therapist tools added in Story 5.1
+        if (tier === "therapist") {
+          return {
+            toolCallStreaming: true,
+            activeTools: [
+              TOOL_NAMES.PRESENT_REFLECTION,
+              TOOL_NAMES.SHOW_WAIT_OPTION,
+            ],
+          };
+        }
         return {};
       },
       stopWhen: stepCountIs(isAutoApproved ? 1 : 5),
