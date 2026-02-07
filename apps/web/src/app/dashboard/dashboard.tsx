@@ -1,16 +1,84 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
 
-import type { authClient } from "@/lib/auth-client";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+
+import { RecentInteractions } from "@/components/dashboard/recent-interactions";
+import { SavingsSummary } from "@/components/dashboard/savings-summary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/utils/trpc";
 
-export default function Dashboard({
-  // biome-ignore lint/correctness/noUnusedFunctionParameters: reserved for user-specific dashboard content
-  session,
-}: {
-  session: typeof authClient.$Infer.Session;
-}) {
-  const privateData = useQuery(trpc.privateData.queryOptions());
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-3" data-testid="dashboard-skeleton">
+      <Skeleton className="h-32 w-full rounded-2xl" />
+      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-10 w-full rounded-lg" />
+    </div>
+  );
+}
 
-  return <p>API: {privateData.data?.message}</p>;
+export default function Dashboard() {
+  const { data, isLoading, error, refetch } = useQuery({
+    ...trpc.dashboard.summary.queryOptions(),
+    refetchOnWindowFocus: true,
+  });
+
+  useEffect(() => {
+    if (error) {
+      console.error("Dashboard query failed:", error);
+    }
+  }, [error]);
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div
+        className="flex flex-col items-center gap-3 py-12 text-center"
+        data-testid="dashboard-error"
+      >
+        <p className="text-muted-foreground text-sm">
+          Unable to load dashboard. Pull to refresh.
+        </p>
+        <button
+          className="rounded-lg bg-primary px-4 py-2 text-primary-foreground text-sm"
+          onClick={() => refetch()}
+          type="button"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Card Vault area (~40vh) — read-only resting state */}
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="text-muted-foreground text-sm">Card Vault</div>
+      </div>
+
+      {/* Scrollable feed (~60vh) */}
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
+        <SavingsSummary
+          acceptanceRate={data.acceptanceRate}
+          interactionCount={data.interactionCount}
+          totalSavedCents={data.totalSavedCents}
+        />
+        <RecentInteractions interactions={data.recentInteractions} />
+
+        {/* Ghost card feed placeholder — Story 7.3 */}
+      </div>
+    </div>
+  );
 }
