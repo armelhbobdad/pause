@@ -124,3 +124,25 @@
     transform: translateY(0);
   }
 }
+
+/* Ghost Card Feedback Flash (Story 6.4)
+   Brief gold/amber highlight when user submits satisfaction feedback */
+@keyframes ghost-feedback-flash {
+  0% {
+    background-color: var(--card-bg);
+  }
+  30% {
+    background-color: oklch(0.3 0.04 85);
+  }
+  100% {
+    background-color: var(--card-bg);
+  }
+}
+
+/* Ghost Card reduced-motion: instant de-frost (Story 6.4, AC4) */
+@media (prefers-reduced-motion: reduce) {
+  [data-ghost-id] {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

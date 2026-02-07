@@ -51,6 +51,20 @@ export const cardStatusEnum = pgEnum("card_status", [
   "removed",
 ]);
 
+/** Ghost card lifecycle status (Story 6.4) */
+export const ghostCardStatusEnum = pgEnum("ghost_card_status", [
+  "pending",
+  "viewed",
+  "feedback_given",
+]);
+
+/** Satisfaction feedback for ghost cards (Story 6.5 — FR26) */
+export const satisfactionFeedbackEnum = pgEnum("satisfaction_feedback", [
+  "worth_it",
+  "regret_it",
+  "not_sure",
+]);
+
 // ============================================================================
 // Skillbook Table (ADR-008: Optimistic Locking)
 // ============================================================================
@@ -148,6 +162,33 @@ export const savings = pgTable(
 );
 
 // ============================================================================
+// Ghost Card Table (Story 6.4 — FR25)
+// ============================================================================
+
+export const ghostCard = pgTable(
+  "ghost_card",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    interactionId: text("interaction_id")
+      .notNull()
+      .unique()
+      .references(() => interaction.id, { onDelete: "cascade" }),
+    status: ghostCardStatusEnum("status").default("pending").notNull(),
+    satisfactionFeedback: satisfactionFeedbackEnum("satisfaction_feedback"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("ghost_card_user_id_created_at_idx").on(
+      table.userId,
+      table.createdAt
+    ),
+  ]
+);
+
+// ============================================================================
 // Relations
 // ============================================================================
 
@@ -176,11 +217,23 @@ export const interactionRelations = relations(interaction, ({ one, many }) => ({
     references: [card.id],
   }),
   savings: many(savings),
+  ghostCard: one(ghostCard),
 }));
 
 export const savingsRelations = relations(savings, ({ one }) => ({
   interaction: one(interaction, {
     fields: [savings.interactionId],
+    references: [interaction.id],
+  }),
+}));
+
+export const ghostCardRelations = relations(ghostCard, ({ one }) => ({
+  user: one(user, {
+    fields: [ghostCard.userId],
+    references: [user.id],
+  }),
+  interaction: one(interaction, {
+    fields: [ghostCard.interactionId],
     references: [interaction.id],
   }),
 }));
