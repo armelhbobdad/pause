@@ -17,6 +17,7 @@ export type {
 export {
   Reflector,
   Skillbook,
+  SkillManager,
   VercelAIClient,
   wrapSkillbookContext,
 } from "@pause/ace";

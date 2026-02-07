@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // --- Hoisted mocks for configurable test state ---
 const mocks = vi.hoisted(() => {
   const mockReflect = vi.fn();
+  const mockCurate = vi.fn();
+  const mockApplyUpdate = vi.fn();
+  const mockSkillbookToDict = vi.fn(() => ({ skills: {} }));
+  const mockSkillbookSkills = vi.fn(() => []);
   const mockDbUpdate = vi.fn();
+  const mockDbInsert = vi.fn();
 
   return {
     reflectResult: null as {
@@ -18,7 +23,12 @@ const mocks = vi.hoisted(() => {
     } | null,
     reflectError: null as Error | null,
     skillbookResult: {
-      skillbook: { skills: () => [], asPrompt: () => "" },
+      skillbook: {
+        skills: mockSkillbookSkills,
+        asPrompt: () => "",
+        applyUpdate: mockApplyUpdate,
+        toDict: mockSkillbookToDict,
+      },
       version: 0,
     },
     skillbookError: null as Error | null,
@@ -28,8 +38,19 @@ const mocks = vi.hoisted(() => {
       flush: ReturnType<typeof vi.fn>;
     } | null,
     dbUpdateError: null as Error | null,
+    /** Controls the rowCount returned by the skillbook update query */
+    skillbookUpdateRowCount: 1,
+    /** If set, the skillbook update query will reject with this error */
+    skillbookUpdateError: null as Error | null,
+    /** If set, the insert query will reject with this error */
+    dbInsertError: null as Error | null,
     mockReflect,
+    mockCurate,
+    mockApplyUpdate,
+    mockSkillbookToDict,
+    mockSkillbookSkills,
     mockDbUpdate,
+    mockDbInsert,
   };
 });
 
@@ -47,6 +68,10 @@ vi.mock("@pause/ace", () => ({
   Reflector: vi.fn(function () {
     return { reflect: mocks.mockReflect };
   }),
+  // biome-ignore lint/complexity/useArrowFunction: vi.fn needs function syntax for constructor
+  SkillManager: vi.fn(function () {
+    return { curate: mocks.mockCurate };
+  }),
   VercelAIClient: vi.fn(),
   Skillbook: vi.fn(),
   wrapSkillbookContext: vi.fn(() => ""),
@@ -54,20 +79,22 @@ vi.mock("@pause/ace", () => ({
 
 // --- Mock @pause/db ---
 vi.mock("@pause/db", () => {
+  // Default chains — will be reset in beforeEach
   const updateChain = {
     set: vi.fn().mockReturnThis(),
-    where: vi.fn(() => {
-      if (mocks.dbUpdateError) {
-        return Promise.reject(mocks.dbUpdateError);
-      }
-      return Promise.resolve();
-    }),
+    where: vi.fn(() => Promise.resolve()),
   };
   mocks.mockDbUpdate.mockReturnValue(updateChain);
+
+  const insertChain = {
+    values: vi.fn(() => Promise.resolve()),
+  };
+  mocks.mockDbInsert.mockReturnValue(insertChain);
 
   return {
     db: {
       update: mocks.mockDbUpdate,
+      insert: mocks.mockDbInsert,
     },
   };
 });
@@ -81,6 +108,11 @@ vi.mock("@pause/db/schema", () => ({
     metadata: "interaction.metadata",
     reasoningSummary: "interaction.reasoningSummary",
     tier: "interaction.tier",
+  },
+  skillbook: {
+    userId: "skillbook.userId",
+    skills: "skillbook.skills",
+    version: "skillbook.version",
   },
   interactionOutcomeEnum: {
     enumValues: [
@@ -99,6 +131,16 @@ vi.mock("@pause/db/schema", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((a: unknown, b: unknown) => ({ eq: [a, b] })),
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
+  sql: Object.assign(
+    vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      sql: strings,
+      values,
+    })),
+    {
+      raw: vi.fn((s: string) => ({ raw: s })),
+    }
+  ),
 }));
 
 // --- Mock ace adapter (this is what learning.ts actually imports) ---
@@ -113,6 +155,11 @@ vi.mock("@/lib/server/ace", () => ({
   Reflector: vi.fn(function () {
     return { reflect: mocks.mockReflect };
   }),
+  // biome-ignore lint/complexity/useArrowFunction: vi.fn needs function syntax for constructor
+  SkillManager: vi.fn(function () {
+    return { curate: mocks.mockCurate };
+  }),
+  Skillbook: vi.fn(),
   VercelAIClient: vi.fn(),
 }));
 
@@ -129,8 +176,10 @@ vi.mock("@/lib/server/utils", () => ({
 // --- Import the module under test ---
 import {
   attachReflectionToTrace,
+  attachSkillUpdateToTrace,
   markLearningComplete,
   runReflection,
+  runSkillUpdate,
 } from "./learning";
 
 const defaultReflectResult = {
@@ -146,18 +195,96 @@ const defaultReflectResult = {
   ],
 };
 
+const defaultUpdateBatch = {
+  reasoning: "Tagging skill-001 as helpful based on user acceptance",
+  operations: [
+    {
+      type: "TAG" as const,
+      section: "negotiation",
+      skill_id: "skill-001",
+      metadata: { helpful: 1 },
+    },
+  ],
+};
+
+/** Helper to set up the DB update mock chain for skillbook updates */
+function setupSkillbookUpdateChain() {
+  let callCount = 0;
+  const updateChain = {
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn(() => {
+      if (mocks.skillbookUpdateError) {
+        return Promise.reject(mocks.skillbookUpdateError);
+      }
+      callCount++;
+      // Return rowCount based on configurable state
+      const rowCount =
+        typeof mocks.skillbookUpdateRowCount === "number"
+          ? mocks.skillbookUpdateRowCount
+          : 1;
+      return Promise.resolve({ rowCount });
+    }),
+  };
+  mocks.mockDbUpdate.mockReturnValue(updateChain);
+  return { updateChain, getCallCount: () => callCount };
+}
+
+/** Helper to set up the DB insert mock chain */
+function setupSkillbookInsertChain() {
+  const insertChain = {
+    values: vi.fn(() => {
+      if (mocks.dbInsertError) {
+        return Promise.reject(mocks.dbInsertError);
+      }
+      return Promise.resolve();
+    }),
+  };
+  mocks.mockDbInsert.mockReturnValue(insertChain);
+  return insertChain;
+}
+
+/** Creates a LearningPipelineResult for runSkillUpdate tests */
+function createPipelineResult(overrides?: {
+  skillbookVersion?: number;
+  skills?: Array<{ id: string }>;
+}) {
+  const mockSkills = overrides?.skills ?? [];
+  const skillbook = {
+    skills: vi.fn(() => mockSkills),
+    asPrompt: () => "",
+    applyUpdate: mocks.mockApplyUpdate,
+    toDict: mocks.mockSkillbookToDict,
+  };
+
+  return {
+    reflectionOutput: defaultReflectResult,
+    interactionId: "int-500",
+    userId: "user-1",
+    skillbook: skillbook as never,
+    skillbookVersion: overrides?.skillbookVersion ?? 1,
+  };
+}
+
 describe("Learning Module", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.reflectResult = defaultReflectResult;
     mocks.reflectError = null;
     mocks.skillbookResult = {
-      skillbook: { skills: () => [], asPrompt: () => "" },
+      skillbook: {
+        skills: mocks.mockSkillbookSkills,
+        asPrompt: () => "",
+        applyUpdate: mocks.mockApplyUpdate,
+        toDict: mocks.mockSkillbookToDict,
+      },
       version: 0,
     };
     mocks.skillbookError = null;
     mocks.opikClient = null;
     mocks.dbUpdateError = null;
+    mocks.skillbookUpdateRowCount = 1;
+    mocks.skillbookUpdateError = null;
+    mocks.dbInsertError = null;
 
     // Reset reflect mock behavior
     mocks.mockReflect.mockImplementation(() => {
@@ -167,17 +294,19 @@ describe("Learning Module", () => {
       return Promise.resolve(mocks.reflectResult);
     });
 
-    // Reset DB update mock chain
-    const updateChain = {
-      set: vi.fn().mockReturnThis(),
-      where: vi.fn(() => {
-        if (mocks.dbUpdateError) {
-          return Promise.reject(mocks.dbUpdateError);
-        }
-        return Promise.resolve();
-      }),
-    };
-    mocks.mockDbUpdate.mockReturnValue(updateChain);
+    // Reset curate mock behavior
+    mocks.mockCurate.mockResolvedValue(defaultUpdateBatch);
+
+    // Reset skillbook mocks
+    mocks.mockApplyUpdate.mockImplementation(() => {
+      /* no-op by default */
+    });
+    mocks.mockSkillbookToDict.mockReturnValue({ skills: {} });
+    mocks.mockSkillbookSkills.mockReturnValue([]);
+
+    // Reset DB chains
+    setupSkillbookUpdateChain();
+    setupSkillbookInsertChain();
   });
 
   // ========================================================================
@@ -202,6 +331,25 @@ describe("Learning Module", () => {
       );
       expect(result?.reflectionOutput.helpful_skill_ids).toEqual(["skill-001"]);
       expect(result?.reflectionOutput.new_learnings).toHaveLength(1);
+    });
+
+    it("includes skillbook and skillbookVersion in result (Story 6.3)", async () => {
+      mocks.skillbookResult = {
+        ...mocks.skillbookResult,
+        version: 5,
+      };
+
+      const result = await runReflection({
+        interactionId: "int-100b",
+        userId: "user-1",
+        question: "test",
+        generatorAnswer: "test",
+        outcome: "accepted",
+      });
+
+      expect(result).not.toBeNull();
+      expect(result?.skillbook).toBe(mocks.skillbookResult.skillbook);
+      expect(result?.skillbookVersion).toBe(5);
     });
 
     it("loads user Skillbook for reflection", async () => {
@@ -359,6 +507,472 @@ describe("Learning Module", () => {
       expect(parsed.timestamp).toBeDefined();
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  // ========================================================================
+  // runSkillUpdate — Story 6.3
+  // ========================================================================
+
+  describe("runSkillUpdate", () => {
+    it("calls SkillManager.curate() with reflection analysis and skillbook (AC1)", async () => {
+      const pipelineResult = createPipelineResult();
+      setupSkillbookUpdateChain();
+
+      await runSkillUpdate(pipelineResult);
+
+      expect(mocks.mockCurate).toHaveBeenCalledWith({
+        reflectionAnalysis: defaultReflectResult.analysis,
+        skillbook: pipelineResult.skillbook,
+      });
+    });
+
+    it("applies UpdateBatch to Skillbook via applyUpdate (AC2)", async () => {
+      const pipelineResult = createPipelineResult();
+      setupSkillbookUpdateChain();
+
+      await runSkillUpdate(pipelineResult);
+
+      expect(mocks.mockApplyUpdate).toHaveBeenCalledWith(defaultUpdateBatch);
+    });
+
+    it("returns UpdateBatch on successful curation + persist (AC1-AC3)", async () => {
+      const pipelineResult = createPipelineResult();
+      setupSkillbookUpdateChain();
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toEqual(defaultUpdateBatch);
+    });
+
+    it("persists Skillbook to DB with optimistic locking (AC3)", async () => {
+      const pipelineResult = createPipelineResult();
+      setupSkillbookUpdateChain();
+
+      await runSkillUpdate(pipelineResult);
+
+      // Verify DB update was called (via withTimeout → db.update)
+      expect(mocks.mockDbUpdate).toHaveBeenCalled();
+    });
+
+    // ========================================================================
+    // Version conflict retry (AC4)
+    // ========================================================================
+
+    it("retries on version conflict: first write fails, retry succeeds (AC4)", async () => {
+      const pipelineResult = createPipelineResult();
+
+      // First call: version conflict (0 rowCount), second: success (1 rowCount)
+      let attempt = 0;
+      const updateChain = {
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn(() => {
+          attempt++;
+          if (attempt === 1) {
+            return Promise.resolve({ rowCount: 0 });
+          }
+          return Promise.resolve({ rowCount: 1 });
+        }),
+      };
+      mocks.mockDbUpdate.mockReturnValue(updateChain);
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toEqual(defaultUpdateBatch);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Version conflict on attempt 1")
+      );
+      // applyUpdate should have been called twice (initial + retry)
+      expect(mocks.mockApplyUpdate).toHaveBeenCalledTimes(2);
+
+      consoleSpy.mockRestore();
+    });
+
+    it("logs RETRY_QUEUE after 3 exhausted retries (AC4)", async () => {
+      const pipelineResult = createPipelineResult();
+
+      // All attempts return 0 rowCount (persistent version conflict)
+      const updateChain = {
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn(() => Promise.resolve({ rowCount: 0 })),
+      };
+      mocks.mockDbUpdate.mockReturnValue(updateChain);
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toBeNull();
+      const retryCall = consoleSpy.mock.calls.find(
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("RETRY_QUEUE") &&
+          call[0].includes("skillbook_update")
+      );
+      expect(retryCall).toBeDefined();
+      const jsonStr = (retryCall?.[0] as string).replace(
+        "[Learning] RETRY_QUEUE: ",
+        ""
+      );
+      const parsed = JSON.parse(jsonStr);
+      expect(parsed.type).toBe("skillbook_update");
+      expect(parsed.userId).toBe("user-1");
+      expect(parsed.interactionId).toBe("int-500");
+
+      consoleSpy.mockRestore();
+    });
+
+    // ========================================================================
+    // SkillManager failure handling (AC6)
+    // ========================================================================
+
+    it("returns null when SkillManager.curate() throws (AC6)", async () => {
+      const pipelineResult = createPipelineResult();
+      mocks.mockCurate.mockRejectedValue(new Error("LLM generation failed"));
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[Learning] Skill update failed"),
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    // ========================================================================
+    // Timeout handling (AC7)
+    // ========================================================================
+
+    it("returns null when curate() times out (AC7)", async () => {
+      const pipelineResult = createPipelineResult();
+      mocks.mockCurate.mockImplementation(
+        () =>
+          new Promise(() => {
+            /* never resolves */
+          })
+      );
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[Learning] Skill update failed"),
+        expect.objectContaining({
+          message: "SkillManager curation timed out",
+        })
+      );
+
+      consoleSpy.mockRestore();
+    }, 15_000);
+
+    // ========================================================================
+    // Empty UpdateBatch
+    // ========================================================================
+
+    it("persists Skillbook even with empty UpdateBatch (no operations)", async () => {
+      const emptyBatch = { reasoning: "No changes needed", operations: [] };
+      mocks.mockCurate.mockResolvedValue(emptyBatch);
+      const pipelineResult = createPipelineResult();
+      setupSkillbookUpdateChain();
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toEqual(emptyBatch);
+      // applyUpdate should still be called with the empty batch
+      expect(mocks.mockApplyUpdate).toHaveBeenCalledWith(emptyBatch);
+      // DB update should still happen
+      expect(mocks.mockDbUpdate).toHaveBeenCalled();
+    });
+
+    // ========================================================================
+    // Opik trace creation (AC5)
+    // ========================================================================
+
+    it("creates learning:skillbook_update Opik trace on success (AC5)", async () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn().mockResolvedValue([]),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const pipelineResult = createPipelineResult({
+        skills: [{ id: "s1" }, { id: "s2" }],
+      });
+      setupSkillbookUpdateChain();
+
+      await runSkillUpdate(pipelineResult);
+
+      expect(mocks.opikClient.trace).toHaveBeenCalledWith({
+        name: "learning:skillbook_update",
+        input: expect.objectContaining({
+          interactionId: "int-500",
+          operationCount: 1,
+          reasoning: defaultUpdateBatch.reasoning,
+        }),
+      });
+      expect(mockTrace.end).toHaveBeenCalled();
+    });
+
+    // ========================================================================
+    // INSERT path for new users (AC3 edge case)
+    // ========================================================================
+
+    it("inserts new skillbook row when version=0 and UPDATE returns 0 rows", async () => {
+      const pipelineResult = createPipelineResult({ skillbookVersion: 0 });
+
+      // UPDATE returns 0 rowCount (no existing row)
+      const updateChain = {
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn(() => Promise.resolve({ rowCount: 0 })),
+      };
+      mocks.mockDbUpdate.mockReturnValue(updateChain);
+
+      const insertChain = setupSkillbookInsertChain();
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toEqual(defaultUpdateBatch);
+      expect(mocks.mockDbInsert).toHaveBeenCalled();
+      expect(insertChain.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          version: 1,
+        })
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("falls back to retry loop when INSERT fails on version=0", async () => {
+      const pipelineResult = createPipelineResult({ skillbookVersion: 0 });
+
+      // INSERT throws (DB error, not just a race condition)
+      mocks.dbInsertError = new Error("DB connection lost");
+      setupSkillbookInsertChain();
+
+      // First UPDATE: 0 rows (triggers INSERT path which fails)
+      // Second UPDATE (after reload with version=1): success
+      let attempt = 0;
+      const updateChain = {
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn(() => {
+          attempt++;
+          if (attempt === 1) {
+            return Promise.resolve({ rowCount: 0 });
+          }
+          return Promise.resolve({ rowCount: 1 });
+        }),
+      };
+      mocks.mockDbUpdate.mockReturnValue(updateChain);
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toEqual(defaultUpdateBatch);
+      // INSERT was attempted and failed
+      expect(mocks.mockDbInsert).toHaveBeenCalled();
+      // Recovery happened via UPDATE retry
+      expect(attempt).toBe(2);
+
+      consoleSpy.mockRestore();
+    });
+
+    // ========================================================================
+    // Re-apply after version conflict (no duplicates)
+    // ========================================================================
+
+    it("re-applies UpdateBatch to fresh Skillbook on retry without duplicates", async () => {
+      const pipelineResult = createPipelineResult({
+        skills: [{ id: "skill-001" }],
+      });
+
+      // First attempt fails (version conflict), second succeeds
+      let attempt = 0;
+      const updateChain = {
+        set: vi.fn().mockReturnThis(),
+        where: vi.fn(() => {
+          attempt++;
+          if (attempt === 1) {
+            return Promise.resolve({ rowCount: 0 });
+          }
+          return Promise.resolve({ rowCount: 1 });
+        }),
+      };
+      mocks.mockDbUpdate.mockReturnValue(updateChain);
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toEqual(defaultUpdateBatch);
+      // applyUpdate called on initial skillbook AND on fresh reload skillbook
+      expect(mocks.mockApplyUpdate).toHaveBeenCalledTimes(2);
+      // Both calls receive the same UpdateBatch
+      expect(mocks.mockApplyUpdate).toHaveBeenNthCalledWith(
+        1,
+        defaultUpdateBatch
+      );
+      expect(mocks.mockApplyUpdate).toHaveBeenNthCalledWith(
+        2,
+        defaultUpdateBatch
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    // ========================================================================
+    // Malformed UpdateBatch resilience
+    // ========================================================================
+
+    it("handles malformed UpdateBatch gracefully (AC10)", async () => {
+      const malformedBatch = {
+        reasoning: "test",
+        operations: [{ type: "UNKNOWN_OP", section: "test" }, { type: "TAG" }],
+      };
+      mocks.mockCurate.mockResolvedValue(malformedBatch);
+      const pipelineResult = createPipelineResult();
+      setupSkillbookUpdateChain();
+
+      // applyUpdate might throw on malformed data — the outer catch should handle it
+      mocks.mockApplyUpdate.mockImplementation(() => {
+        // Skillbook.applyUpdate() silently ignores unknown operation types per ACE framework
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      // Should still succeed since applyUpdate handles it gracefully
+      expect(result).toEqual(malformedBatch);
+      expect(mocks.mockApplyUpdate).toHaveBeenCalledWith(malformedBatch);
+    });
+
+    it("returns null when applyUpdate throws on truly broken batch", async () => {
+      mocks.mockCurate.mockResolvedValue(defaultUpdateBatch);
+      const pipelineResult = createPipelineResult();
+      mocks.mockApplyUpdate.mockImplementation(() => {
+        throw new TypeError("Cannot read properties of undefined");
+      });
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[Learning] Skill update failed"),
+        expect.any(TypeError)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    // ========================================================================
+    // DB persistence failure after successful curation (AC6)
+    // ========================================================================
+
+    it("returns null when DB persistSkillbookUpdate throws (AC6)", async () => {
+      const pipelineResult = createPipelineResult();
+      mocks.skillbookUpdateError = new Error("DB connection lost");
+      setupSkillbookUpdateChain();
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const result = await runSkillUpdate(pipelineResult);
+
+      expect(result).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[Learning] Skill update failed"),
+        expect.any(Error)
+      );
+      // curate succeeded and applyUpdate was called before DB failed
+      expect(mocks.mockCurate).toHaveBeenCalled();
+      expect(mocks.mockApplyUpdate).toHaveBeenCalledWith(defaultUpdateBatch);
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  // ========================================================================
+  // attachSkillUpdateToTrace — Opik trace for skill updates (AC5)
+  // ========================================================================
+
+  describe("attachSkillUpdateToTrace", () => {
+    it("creates learning:skillbook_update trace with correct metadata", () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn(),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      attachSkillUpdateToTrace("int-600", defaultUpdateBatch, 3, 4);
+
+      expect(mocks.opikClient.trace).toHaveBeenCalledWith({
+        name: "learning:skillbook_update",
+        input: {
+          interactionId: "int-600",
+          operationCount: 1,
+          skillCountBefore: 3,
+          skillCountAfter: 4,
+          reasoning: defaultUpdateBatch.reasoning,
+          operations: [
+            {
+              type: "TAG",
+              section: "negotiation",
+              skill_id: "skill-001",
+            },
+          ],
+        },
+      });
+      expect(mockTrace.end).toHaveBeenCalled();
+    });
+
+    it("does nothing when Opik client is null", () => {
+      mocks.opikClient = null;
+
+      // Should not throw
+      attachSkillUpdateToTrace("int-601", defaultUpdateBatch, 0, 1);
+    });
+
+    it("does not throw when flush fails", () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn(),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockRejectedValue(new Error("flush failed")),
+      };
+
+      // Should not throw
+      attachSkillUpdateToTrace("int-602", defaultUpdateBatch, 0, 1);
     });
   });
 

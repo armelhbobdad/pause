@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
   const mockRunReflection = vi.fn();
   const mockAttachReflectionToTrace = vi.fn();
   const mockMarkLearningComplete = vi.fn();
+  const mockRunSkillUpdate = vi.fn();
 
   return {
     session: null as { user: { id: string } } | null,
@@ -28,6 +29,7 @@ const mocks = vi.hoisted(() => {
     mockRunReflection,
     mockAttachReflectionToTrace,
     mockMarkLearningComplete,
+    mockRunSkillUpdate,
   };
 });
 
@@ -118,6 +120,7 @@ vi.mock("@/lib/server/learning", () => ({
   runReflection: mocks.mockRunReflection,
   attachReflectionToTrace: mocks.mockAttachReflectionToTrace,
   markLearningComplete: mocks.mockMarkLearningComplete,
+  runSkillUpdate: mocks.mockRunSkillUpdate,
 }));
 
 // --- Import the route handler ---
@@ -157,6 +160,7 @@ describe("Feedback Recording Route Handler", () => {
     mocks.mockRunReflection.mockResolvedValue(null);
     mocks.mockAttachReflectionToTrace.mockResolvedValue(undefined);
     mocks.mockMarkLearningComplete.mockResolvedValue(undefined);
+    mocks.mockRunSkillUpdate.mockResolvedValue(null);
     setupMockChains();
   });
 
@@ -639,6 +643,53 @@ describe("Feedback Recording Route Handler", () => {
       );
 
       consoleSpy.mockRestore();
+    });
+
+    // ========================================================================
+    // Story 6.3: runSkillUpdate integration in pipeline
+    // ========================================================================
+
+    it("calls runSkillUpdate with reflection result in after() (Story 6.3)", async () => {
+      const pipelineResult = {
+        reflectionOutput: { analysis: "Good outcome" },
+        interactionId: "int-123",
+        userId: "user-1",
+        skillbook: { skills: () => [], asPrompt: () => "" },
+        skillbookVersion: 2,
+      };
+      mocks.mockRunReflection.mockResolvedValue(pipelineResult);
+
+      await POST(createRequest(validBody));
+      await mocks.mockAfterCallbacks[0]();
+
+      expect(mocks.mockRunSkillUpdate).toHaveBeenCalledWith(pipelineResult);
+    });
+
+    it("does not call runSkillUpdate when runReflection returns null", async () => {
+      mocks.mockRunReflection.mockResolvedValue(null);
+
+      await POST(createRequest(validBody));
+      await mocks.mockAfterCallbacks[0]();
+
+      expect(mocks.mockRunSkillUpdate).not.toHaveBeenCalled();
+    });
+
+    it("continues pipeline when runSkillUpdate returns null (failure isolation)", async () => {
+      mocks.mockRunReflection.mockResolvedValue({
+        reflectionOutput: { analysis: "test" },
+        interactionId: "int-123",
+        userId: "user-1",
+        skillbook: { skills: () => [] },
+        skillbookVersion: 1,
+      });
+      mocks.mockRunSkillUpdate.mockResolvedValue(null);
+
+      await POST(createRequest(validBody));
+      await mocks.mockAfterCallbacks[0]();
+
+      // Pipeline should still call trace attachment and mark complete
+      expect(mocks.mockAttachReflectionToTrace).toHaveBeenCalled();
+      expect(mocks.mockMarkLearningComplete).toHaveBeenCalled();
     });
   });
 });

@@ -9,6 +9,7 @@ import {
   attachReflectionToTrace,
   markLearningComplete,
   runReflection,
+  runSkillUpdate,
 } from "@/lib/server/learning";
 import { withTimeout } from "@/lib/server/utils";
 
@@ -46,7 +47,7 @@ const requestSchema = z.object({
  * not via this feedback route — they'll need their own learning trigger. */
 const LEARNABLE_OUTCOMES = ["accepted", "overridden", "wait", "abandoned"];
 
-/** Runs the learning pipeline stages after feedback is recorded (Story 6.2) */
+/** Runs the learning pipeline stages after feedback is recorded (Story 6.2, 6.3) */
 async function runLearningPipeline(params: {
   interactionId: string;
   userId: string;
@@ -71,6 +72,9 @@ async function runLearningPipeline(params: {
   if (!result) {
     return;
   }
+
+  // Story 6.3: Run SkillManager curation + persist (sequential — must complete before traces)
+  await runSkillUpdate(result);
 
   // Opik trace attachment and status update run independently via Promise.allSettled
   const [opikResult, statusResult] = await Promise.allSettled([
