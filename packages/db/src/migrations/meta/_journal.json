@@ -36,6 +36,13 @@
       "when": 1770453309252,
       "tag": "0004_needy_blur",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770456245894,
+      "tag": "0005_curvy_yellowjacket",
+      "breakpoints": true
     }
   ]
 }

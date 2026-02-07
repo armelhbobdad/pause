@@ -2,18 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+import { BANNED_TERMS_MAP } from "../filters";
 import { THERAPIST_SYSTEM_PROMPT } from "./therapist";
 
-const BANNED_TERMS = [
-  "addiction",
-  "compulsive",
-  "disorder",
-  "therapy",
-  "treatment",
-  "diagnosis",
-  "symptoms",
-  "condition",
-];
+const BANNED_TERMS = Object.keys(BANNED_TERMS_MAP);
 
 describe("THERAPIST_SYSTEM_PROMPT", () => {
   it("contains strategy selection instructions", () => {

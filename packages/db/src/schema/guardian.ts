@@ -117,6 +117,7 @@ export const interaction = pgTable(
     status: interactionStatusEnum("status").default("pending").notNull(),
     outcome: interactionOutcomeEnum("outcome"),
     reasoningSummary: text("reasoning_summary"),
+    metadata: jsonb("metadata"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
