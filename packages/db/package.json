@@ -11,10 +11,11 @@
     }
   },
   "scripts": {
-    "db:push": "drizzle-kit push",
-    "db:generate": "drizzle-kit generate",
+    "db:clean-migrations": "find src/migrations -name 'CLAUDE.md' -delete 2>/dev/null; true",
+    "db:push": "bun run db:clean-migrations && drizzle-kit push",
+    "db:generate": "bun run db:clean-migrations && drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "bun run db:clean-migrations && drizzle-kit migrate",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

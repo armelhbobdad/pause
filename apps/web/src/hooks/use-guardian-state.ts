@@ -147,7 +147,14 @@ function guardianReducer(
   state: GuardianInternalState,
   action: GuardianAction
 ): GuardianInternalState {
-  return TRANSITIONS[state.status][action.type] ?? state;
+  const nextState = TRANSITIONS[state.status][action.type];
+  if (nextState === undefined) {
+    console.warn(
+      `[useGuardianState] No transition for action "${action.type}" in state "${state.status}"`
+    );
+    return state;
+  }
+  return nextState;
 }
 
 // ============================================================================
@@ -298,8 +305,8 @@ export function useGuardianState(
   }
 
   function relock() {
-    // Only process if in revealed state
-    if (state !== "revealed") {
+    // Valid from both revealed and active states (Story 5.3: wait flow dispatches from active)
+    if (state !== "revealed" && state !== "active") {
       return;
     }
     dispatch({ type: "RELOCK" });
