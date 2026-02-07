@@ -33,7 +33,7 @@ const OUTCOME_DISPLAY = {
   overridden: {
     label: "Overridden",
     icon: "\u2192",
-    colorVar: "--tier-therapist",
+    colorVar: "--therapist-amber",
   },
   abandoned: {
     label: "Abandoned",
@@ -48,7 +48,7 @@ const OUTCOME_DISPLAY = {
   break_glass: {
     label: "Manual unlock",
     icon: "\u2192",
-    colorVar: "--tier-therapist",
+    colorVar: "--therapist-amber",
   },
   wizard_bookmark: {
     label: "Bookmarked",
