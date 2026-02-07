@@ -14,6 +14,7 @@ import { after } from "next/server";
 import z from "zod";
 import { TOOL_NAMES } from "@/lib/guardian/tool-names";
 import { loadUserSkillbook } from "@/lib/server/ace";
+import { createBannedTermFilter } from "@/lib/server/guardian/filters";
 import { ANALYST_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/analyst";
 import { NEGOTIATOR_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/negotiator";
 import { THERAPIST_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/therapist";
@@ -23,6 +24,9 @@ import {
   type InteractionTier,
 } from "@/lib/server/guardian/tiers";
 import { searchCouponsTool } from "@/lib/server/guardian/tools/coupon-search";
+import { presentReflectionTool } from "@/lib/server/guardian/tools/reflection-prompt";
+import { showWaitOptionTool } from "@/lib/server/guardian/tools/wait-option";
+import { presentWizardOptionTool } from "@/lib/server/guardian/tools/wizard-option";
 import { getGuardianTelemetry, logDegradationTrace } from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
@@ -173,6 +177,12 @@ export async function POST(req: Request) {
     });
   }
 
+  // --- Banned terminology guardrail (Story 5.4, AC#3, #4, #7) ---
+  const bannedTermReplacements: Array<{
+    original: string;
+    replacement: string | null;
+  }> = [];
+
   try {
     const result = streamText({
       model: google("gemini-2.5-flash"),
@@ -180,6 +190,9 @@ export async function POST(req: Request) {
       messages: modelMessages,
       tools: {
         [TOOL_NAMES.SEARCH_COUPONS]: searchCouponsTool,
+        [TOOL_NAMES.PRESENT_REFLECTION]: presentReflectionTool,
+        [TOOL_NAMES.SHOW_WAIT_OPTION]: showWaitOptionTool,
+        [TOOL_NAMES.PRESENT_WIZARD_OPTION]: presentWizardOptionTool,
       },
       prepareStep: () => {
         if (tier === "negotiator") {
@@ -188,10 +201,22 @@ export async function POST(req: Request) {
             activeTools: [TOOL_NAMES.SEARCH_COUPONS],
           };
         }
-        // Therapist tools added in Story 5.1
+        if (tier === "therapist") {
+          const activeTools: import("@/lib/guardian/tool-names").ToolName[] = [
+            TOOL_NAMES.PRESENT_REFLECTION,
+            TOOL_NAMES.SHOW_WAIT_OPTION,
+          ];
+          if (riskResult.score >= 85) {
+            activeTools.push(TOOL_NAMES.PRESENT_WIZARD_OPTION);
+          }
+          return { toolCallStreaming: true, activeTools };
+        }
         return {};
       },
       stopWhen: stepCountIs(isAutoApproved ? 1 : 5),
+      experimental_transform: createBannedTermFilter((replacements) => {
+        bannedTermReplacements.push(...replacements);
+      }),
       experimental_telemetry: getGuardianTelemetry(
         interactionId,
         {
@@ -218,6 +243,13 @@ export async function POST(req: Request) {
           return;
         }
 
+        // --- Banned term replacement logging (Story 5.4, AC#4, FR46) ---
+        if (bannedTermReplacements.length > 0) {
+          console.warn(
+            `[Guardian] Banned term replaced in interaction ${interactionId}`
+          );
+        }
+
         // Extract reasoning summary for observability (NFR-O2)
         let reasoningSummary: string;
         if (isAutoApproved) {
@@ -235,6 +267,14 @@ export async function POST(req: Request) {
             status: "completed",
             ...(isAutoApproved && { outcome: "auto_approved" }),
             reasoningSummary,
+            ...(bannedTermReplacements.length > 0 && {
+              metadata: {
+                banned_terms_replaced: bannedTermReplacements.map((r) => ({
+                  original: r.original,
+                  replacement: r.replacement,
+                })),
+              },
+            }),
           })
           .where(eq(interaction.id, interactionId));
       } catch (error) {

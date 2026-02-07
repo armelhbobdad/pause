@@ -112,6 +112,7 @@ interface GuardianInternalState {
  * - active → revealed (Guardian approved via REVEAL_APPROVED)
  * - active → revealed (User override via REVEAL_OVERRIDE)
  * - active → revealed/break_glass (GUARDIAN_ERROR, Story 2.6)
+ * - active → idle (wait/defer re-locks card via RELOCK, Story 5.3)
  * - collapsing → idle (animation completes via COLLAPSE_COMPLETE)
  * - revealed → idle (countdown expired or manual relock via RELOCK)
  */
@@ -132,6 +133,7 @@ const TRANSITIONS: Record<
     REVEAL_APPROVED: { status: "revealed", revealType: "earned" },
     REVEAL_OVERRIDE: { status: "revealed", revealType: "override" },
     GUARDIAN_ERROR: { status: "revealed", revealType: "break_glass" },
+    RELOCK: { status: "idle", revealType: null },
   },
   collapsing: {
     COLLAPSE_COMPLETE: { status: "idle", revealType: null },

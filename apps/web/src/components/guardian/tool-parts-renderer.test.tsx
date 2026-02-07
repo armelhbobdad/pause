@@ -3,7 +3,13 @@ import userEvent from "@testing-library/user-event";
 import type { DynamicToolUIPart, UIMessage } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MessageRenderer } from "./message-renderer";
-import { isBestOffer, ToolPartsRenderer } from "./tool-parts-renderer";
+import {
+  isBestOffer,
+  isReflectionPrompt,
+  isWaitOption,
+  isWizardOption,
+  ToolPartsRenderer,
+} from "./tool-parts-renderer";
 
 // ============================================================================
 // Hoisted mocks
@@ -88,6 +94,185 @@ vi.mock("streamdown", () => ({
   ),
 }));
 
+vi.mock("@/components/guardian/reflection-prompt", () => ({
+  ReflectionPrompt: ({
+    output,
+    onOverride,
+    onWait,
+    disabled,
+  }: {
+    output: {
+      strategyId: string;
+      reflectionPrompt: string;
+      strategyName: string;
+    };
+    onOverride?: () => void;
+    onWait?: () => void;
+    disabled?: boolean;
+  }) => (
+    <div data-disabled={disabled} data-testid="reflection-prompt">
+      {output.reflectionPrompt}:{output.strategyName}
+      {onOverride && (
+        <button
+          data-testid="override-button"
+          onClick={onOverride}
+          type="button"
+        >
+          Override
+        </button>
+      )}
+      {onWait && (
+        <button
+          data-testid="reflection-wait-button"
+          onClick={onWait}
+          type="button"
+        >
+          Wait
+        </button>
+      )}
+    </div>
+  ),
+}));
+
+vi.mock("@/components/guardian/wait-card", () => ({
+  WaitCard: ({
+    output,
+    onOverride,
+    onWait,
+    disabled,
+  }: {
+    output: { durationHours: number; reasoning: string };
+    onOverride?: () => void;
+    onWait?: () => void;
+    disabled?: boolean;
+  }) => (
+    <div data-disabled={disabled} data-testid="wait-card">
+      {output.reasoning}:{output.durationHours}h
+      {onOverride && (
+        <button
+          data-testid="wait-override-button"
+          onClick={onOverride}
+          type="button"
+        >
+          Override
+        </button>
+      )}
+      {onWait && (
+        <button data-testid="wait-sleep-button" onClick={onWait} type="button">
+          Sleep
+        </button>
+      )}
+    </div>
+  ),
+}));
+
+vi.mock("@/components/guardian/wizard-card", () => ({
+  WizardCard: ({
+    reasoning,
+    onExplore,
+    onSkip,
+    disabled,
+  }: {
+    reasoning: string;
+    onExplore?: () => void;
+    onSkip?: () => void;
+    disabled?: boolean;
+  }) => (
+    <div data-disabled={disabled} data-testid="wizard-card">
+      {reasoning}
+      {onExplore && (
+        <button
+          data-testid="wizard-explore-button"
+          onClick={onExplore}
+          type="button"
+        >
+          Explore
+        </button>
+      )}
+      {onSkip && (
+        <button data-testid="wizard-skip-button" onClick={onSkip} type="button">
+          Skip
+        </button>
+      )}
+    </div>
+  ),
+}));
+
+vi.mock("@/components/guardian/reflection-wizard", () => ({
+  ReflectionWizard: ({
+    onComplete,
+    onAbandon,
+    disabled,
+  }: {
+    onComplete?: (
+      responses: Array<{ step: number; question: string; answer: string }>,
+      outcome: "wait" | "override" | "wizard_bookmark"
+    ) => void;
+    onAbandon?: (lastCompletedStep: number) => void;
+    disabled?: boolean;
+  }) => (
+    <div data-disabled={disabled} data-testid="reflection-wizard">
+      ReflectionWizard
+      {onComplete && (
+        <button
+          data-testid="wizard-complete-wait"
+          onClick={() =>
+            onComplete(
+              [
+                { step: 1, question: "Q1", answer: "A1" },
+                { step: 2, question: "Q2", answer: "A2" },
+                { step: 3, question: "Q3", answer: "A3" },
+              ],
+              "wait"
+            )
+          }
+          type="button"
+        >
+          Complete Wait
+        </button>
+      )}
+      {onComplete && (
+        <button
+          data-testid="wizard-complete-override"
+          onClick={() =>
+            onComplete([{ step: 1, question: "Q1", answer: "A1" }], "override")
+          }
+          type="button"
+        >
+          Complete Override
+        </button>
+      )}
+      {onComplete && (
+        <button
+          data-testid="wizard-complete-bookmark"
+          onClick={() =>
+            onComplete(
+              [
+                { step: 1, question: "Q1", answer: "A1" },
+                { step: 2, question: "Q2", answer: "A2" },
+                { step: 3, question: "Q3", answer: "A3" },
+              ],
+              "wizard_bookmark"
+            )
+          }
+          type="button"
+        >
+          Complete Bookmark
+        </button>
+      )}
+      {onAbandon && (
+        <button
+          data-testid="wizard-abandon"
+          onClick={() => onAbandon(1)}
+          type="button"
+        >
+          Abandon
+        </button>
+      )}
+    </div>
+  ),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: mocks.toastSuccess,
@@ -158,24 +343,55 @@ describe("ToolPartsRenderer", () => {
     );
   });
 
-  it("renders placeholder for present_reflection", () => {
+  it("renders ReflectionPromptContainer for present_reflection tool", () => {
     const part = makeToolPart({
       toolName: "present_reflection",
-      output: {},
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
     });
 
     render(<ToolPartsRenderer part={part} />);
-    expect(screen.getByText("Reflection prompt (Epic 5)")).toBeInTheDocument();
+    expect(screen.getByTestId("reflection-prompt")).toHaveTextContent(
+      "What would tomorrow-you think?:Future-Self Visualization"
+    );
   });
 
-  it("renders placeholder for show_wait_option", () => {
+  it("renders WaitCardContainer for show_wait_option tool", () => {
     const part = makeToolPart({
       toolName: "show_wait_option",
-      output: {},
+      output: {
+        durationHours: 24,
+        reasoning: "Sleeping on it helps",
+      },
     });
 
     render(<ToolPartsRenderer part={part} />);
-    expect(screen.getByText("Wait option (Epic 5)")).toBeInTheDocument();
+    expect(screen.getByTestId("wait-card")).toHaveTextContent(
+      "Sleeping on it helps:24h"
+    );
+  });
+
+  it("renders fallback when reflection output is invalid shape", () => {
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: { invalid: true },
+    });
+
+    render(<ToolPartsRenderer part={part} />);
+    expect(screen.getByText("Reflection data unavailable")).toBeInTheDocument();
+  });
+
+  it("renders fallback when wait output is invalid shape", () => {
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { invalid: true },
+    });
+
+    render(<ToolPartsRenderer part={part} />);
+    expect(screen.getByText("Wait option unavailable")).toBeInTheDocument();
   });
 
   // AC#5: Null/loading states
@@ -256,6 +472,46 @@ describe("ToolPartsRenderer", () => {
 
     const { container } = render(<ToolPartsRenderer part={part} />);
     expect(container.querySelector("[data-tool-loading]")).toBeInTheDocument();
+  });
+
+  // --- Story 5.2 AC6: shimmer has aria-label for accessibility ---
+  it('shimmer loading state has aria-label="Loading tool result" (AC6)', () => {
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      state: "input-available",
+    });
+
+    render(<ToolPartsRenderer part={part} />);
+    expect(screen.getByLabelText("Loading tool result")).toBeInTheDocument();
+  });
+
+  it("shimmer has data-tool-loading attribute for CSS targeting (AC6)", () => {
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      state: "input-streaming",
+    });
+
+    const { container } = render(<ToolPartsRenderer part={part} />);
+    const loader = container.querySelector("[data-tool-loading]");
+    expect(loader).toBeInTheDocument();
+    expect(loader).toHaveAttribute("aria-label", "Loading tool result");
+  });
+
+  it("output-available state renders correct component, not shimmer (AC6)", () => {
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    const { container } = render(<ToolPartsRenderer part={part} />);
+    expect(
+      container.querySelector("[data-tool-loading]")
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("reflection-prompt")).toBeInTheDocument();
   });
 
   // AC#6: Invalid result data handling
@@ -923,6 +1179,698 @@ describe("SavingsTicketContainer skip flow (via ToolPartsRenderer)", () => {
         "data-is-skipped",
         "true"
       );
+    });
+  });
+});
+
+// ============================================================================
+// isReflectionPrompt type guard (Story 5.1)
+// ============================================================================
+
+describe("isReflectionPrompt", () => {
+  it("returns true for valid ReflectionPromptOutput shape", () => {
+    expect(
+      isReflectionPrompt({
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      })
+    ).toBe(true);
+  });
+
+  it("returns false for null", () => {
+    expect(isReflectionPrompt(null)).toBe(false);
+  });
+
+  it("returns false for non-object", () => {
+    expect(isReflectionPrompt("string")).toBe(false);
+  });
+
+  it("returns false for missing required fields", () => {
+    expect(isReflectionPrompt({ strategyId: "future_self" })).toBe(false);
+  });
+
+  it("returns false when reflectionPrompt is not a string", () => {
+    expect(
+      isReflectionPrompt({
+        strategyId: "future_self",
+        reflectionPrompt: 42,
+        strategyName: "Test",
+      })
+    ).toBe(false);
+  });
+});
+
+// ============================================================================
+// isWaitOption type guard (Story 5.1)
+// ============================================================================
+
+describe("isWaitOption", () => {
+  it("returns true for valid WaitOptionOutput shape", () => {
+    expect(
+      isWaitOption({
+        durationHours: 24,
+        reasoning: "Sleeping on it helps",
+      })
+    ).toBe(true);
+  });
+
+  it("returns false for null", () => {
+    expect(isWaitOption(null)).toBe(false);
+  });
+
+  it("returns false for non-object", () => {
+    expect(isWaitOption(123)).toBe(false);
+  });
+
+  it("returns false for missing durationHours", () => {
+    expect(isWaitOption({ reasoning: "test" })).toBe(false);
+  });
+
+  it("returns false when durationHours is not a number", () => {
+    expect(isWaitOption({ durationHours: "24", reasoning: "test" })).toBe(
+      false
+    );
+  });
+});
+
+// ============================================================================
+// WaitCardContainer — Wait flow (Story 5.3)
+// ============================================================================
+
+describe("WaitCardContainer wait flow (via ToolPartsRenderer)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it("WaitCardContainer posts to wait-defer endpoint on wait click", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { durationHours: 24, reasoning: "Sleeping on it helps" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("wait-sleep-button"));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/wait-defer",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ interactionId: "int-123" }),
+        })
+      );
+    });
+  });
+
+  it("WaitCardContainer calls onWait callback after successful POST", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { durationHours: 24, reasoning: "Sleeping on it helps" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("wait-sleep-button"));
+
+    await waitFor(() => {
+      expect(mockWait).toHaveBeenCalled();
+    });
+  });
+
+  it("WaitCardContainer shows success toast after wait", async () => {
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { durationHours: 24, reasoning: "Sleeping on it helps" },
+    });
+
+    render(
+      <ToolPartsRenderer interactionId="int-123" onWait={vi.fn()} part={part} />
+    );
+
+    await user.click(screen.getByTestId("wait-sleep-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastSuccess).toHaveBeenCalledWith(
+        "Good call. Your card will be here when you're ready."
+      );
+    });
+  });
+
+  it("WaitCardContainer shows error toast on API failure and does NOT call onWait", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "fail" }), { status: 500 })
+    );
+
+    const part = makeToolPart({
+      toolName: "show_wait_option",
+      output: { durationHours: 24, reasoning: "Sleeping on it helps" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("wait-sleep-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Something went wrong. Try again.",
+        expect.objectContaining({ duration: 4000 })
+      );
+    });
+
+    expect(mockWait).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// ReflectionPromptContainer — Wait flow (Story 5.3)
+// ============================================================================
+
+describe("ReflectionPromptContainer wait flow (via ToolPartsRenderer)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it("ReflectionPromptContainer posts to wait-defer endpoint on wait click", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("reflection-wait-button"));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/wait-defer",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ interactionId: "int-123" }),
+        })
+      );
+    });
+  });
+
+  it("ReflectionPromptContainer calls onWait callback after successful POST", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("reflection-wait-button"));
+
+    await waitFor(() => {
+      expect(mockWait).toHaveBeenCalled();
+    });
+  });
+
+  it("ReflectionPromptContainer shows success toast after wait", async () => {
+    const user = userEvent.setup();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    render(
+      <ToolPartsRenderer interactionId="int-123" onWait={vi.fn()} part={part} />
+    );
+
+    await user.click(screen.getByTestId("reflection-wait-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastSuccess).toHaveBeenCalledWith(
+        "Good call. Your card will be here when you're ready."
+      );
+    });
+  });
+
+  it("ReflectionPromptContainer shows error toast on API failure and does NOT call onWait", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "fail" }), { status: 500 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_reflection",
+      output: {
+        strategyId: "future_self",
+        reflectionPrompt: "What would tomorrow-you think?",
+        strategyName: "Future-Self Visualization",
+      },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    await user.click(screen.getByTestId("reflection-wait-button"));
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Something went wrong. Try again.",
+        expect.objectContaining({ duration: 4000 })
+      );
+    });
+
+    expect(mockWait).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// isWizardOption type guard (Story 5.5)
+// ============================================================================
+
+describe("isWizardOption", () => {
+  it("returns true for valid WizardOptionOutput shape", () => {
+    expect(
+      isWizardOption({
+        wizardAvailable: true,
+        reasoning: "High-risk purchase detected",
+      })
+    ).toBe(true);
+  });
+
+  it("returns false for null", () => {
+    expect(isWizardOption(null)).toBe(false);
+  });
+
+  it("returns false for non-object", () => {
+    expect(isWizardOption("string")).toBe(false);
+  });
+
+  it("returns false for missing wizardAvailable", () => {
+    expect(isWizardOption({ reasoning: "test" })).toBe(false);
+  });
+
+  it("returns false when wizardAvailable is not a boolean", () => {
+    expect(isWizardOption({ wizardAvailable: "yes", reasoning: "test" })).toBe(
+      false
+    );
+  });
+
+  it("returns false when reasoning is not a string", () => {
+    expect(isWizardOption({ wizardAvailable: true, reasoning: 42 })).toBe(
+      false
+    );
+  });
+});
+
+// ============================================================================
+// WizardOptionContainer — Wizard flow (Story 5.5)
+// ============================================================================
+
+describe("WizardOptionContainer (via ToolPartsRenderer)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it("renders WizardCard for present_wizard_option tool", () => {
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: {
+        wizardAvailable: true,
+        reasoning: "This looks like an emotional purchase",
+      },
+    });
+
+    render(<ToolPartsRenderer part={part} />);
+    expect(screen.getByTestId("wizard-card")).toHaveTextContent(
+      "This looks like an emotional purchase"
+    );
+  });
+
+  it("renders fallback when wizard output is invalid shape", () => {
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { invalid: true },
+    });
+
+    render(<ToolPartsRenderer part={part} />);
+    expect(screen.getByText("Wizard option unavailable")).toBeInTheDocument();
+  });
+
+  it("renders WizardCard with disabled=true when interactionId is null", () => {
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { wizardAvailable: true, reasoning: "Test reasoning" },
+    });
+
+    render(<ToolPartsRenderer interactionId={null} part={part} />);
+
+    expect(screen.getByTestId("wizard-card")).toHaveAttribute(
+      "data-disabled",
+      "true"
+    );
+  });
+
+  it("renders WizardCard with disabled=false when interactionId is present", () => {
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { wizardAvailable: true, reasoning: "Test reasoning" },
+    });
+
+    render(<ToolPartsRenderer interactionId="int-123" part={part} />);
+
+    expect(screen.getByTestId("wizard-card")).toHaveAttribute(
+      "data-disabled",
+      "false"
+    );
+  });
+
+  it("opens ReflectionWizard when Explore button is clicked", async () => {
+    const user = userEvent.setup();
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { wizardAvailable: true, reasoning: "Test reasoning" },
+    });
+
+    render(<ToolPartsRenderer interactionId="int-123" part={part} />);
+
+    await user.click(screen.getByTestId("wizard-explore-button"));
+    expect(screen.getByTestId("reflection-wizard")).toBeInTheDocument();
+  });
+
+  it("onSkip dismisses the wizard card without calling onWait", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { wizardAvailable: true, reasoning: "Test reasoning" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    expect(screen.getByTestId("wizard-card")).toBeInTheDocument();
+    await user.click(screen.getByTestId("wizard-skip-button"));
+    expect(screen.queryByTestId("wizard-card")).not.toBeInTheDocument();
+    expect(mockWait).not.toHaveBeenCalled();
+  });
+
+  it("wizard complete with 'wait' outcome posts to wizard-complete and calls onWait", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { wizardAvailable: true, reasoning: "Test reasoning" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    // Open wizard
+    await user.click(screen.getByTestId("wizard-explore-button"));
+    // Complete with "wait" outcome
+    await user.click(screen.getByTestId("wizard-complete-wait"));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/wizard-complete",
+        expect.objectContaining({
+          method: "POST",
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockWait).toHaveBeenCalled();
+    });
+  });
+
+  it("wizard complete with 'override' outcome posts to wizard-complete and calls onRevealApproved", async () => {
+    const user = userEvent.setup();
+    const mockReveal = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { wizardAvailable: true, reasoning: "Test reasoning" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onRevealApproved={mockReveal}
+        part={part}
+      />
+    );
+
+    // Open wizard
+    await user.click(screen.getByTestId("wizard-explore-button"));
+    // Complete with "override" outcome
+    await user.click(screen.getByTestId("wizard-complete-override"));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/wizard-complete",
+        expect.objectContaining({
+          method: "POST",
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockReveal).toHaveBeenCalled();
+    });
+
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Card unlocked.",
+      expect.objectContaining({ duration: 3000 })
+    );
+  });
+
+  it("wizard complete with 'wizard_bookmark' outcome posts to wizard-complete and calls onWait", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { wizardAvailable: true, reasoning: "Test reasoning" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    // Open wizard
+    await user.click(screen.getByTestId("wizard-explore-button"));
+    // Complete with "wizard_bookmark" outcome
+    await user.click(screen.getByTestId("wizard-complete-bookmark"));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/wizard-complete",
+        expect.objectContaining({
+          method: "POST",
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockWait).toHaveBeenCalled();
+    });
+
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      "Reflection saved. Your card will be here when you're ready."
+    );
+  });
+
+  it("wizard complete shows error toast on API failure", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "fail" }), { status: 500 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { wizardAvailable: true, reasoning: "Test reasoning" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    // Open wizard
+    await user.click(screen.getByTestId("wizard-explore-button"));
+    // Attempt complete
+    await user.click(screen.getByTestId("wizard-complete-wait"));
+
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Something went wrong. Try again.",
+        expect.objectContaining({ duration: 4000 })
+      );
+    });
+
+    expect(mockWait).not.toHaveBeenCalled();
+  });
+
+  it("wizard abandon posts to wizard-abandon endpoint", async () => {
+    const user = userEvent.setup();
+    const mockWait = vi.fn();
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+
+    const part = makeToolPart({
+      toolName: "present_wizard_option",
+      output: { wizardAvailable: true, reasoning: "Test reasoning" },
+    });
+
+    render(
+      <ToolPartsRenderer
+        interactionId="int-123"
+        onWait={mockWait}
+        part={part}
+      />
+    );
+
+    // Open wizard
+    await user.click(screen.getByTestId("wizard-explore-button"));
+    // Abandon wizard
+    await user.click(screen.getByTestId("wizard-abandon"));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "/api/ai/guardian/wizard-abandon",
+        expect.objectContaining({
+          method: "POST",
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockWait).toHaveBeenCalled();
     });
   });
 });

@@ -54,7 +54,9 @@ export type InteractionOutcome =
   | "override"
   | "wait"
   | "abandoned"
-  | "break_glass";
+  | "break_glass"
+  | "wizard_bookmark"
+  | "wizard_abandoned";
 
 /**
  * Callback type for outcome recording
@@ -92,4 +94,42 @@ export interface BestOffer {
   source: string;
   expiresAt: string | null;
   selectionReasoning: string;
+}
+
+// ============================================================================
+// Reflection Prompt Output (Therapist Tier — Story 5.1)
+// ============================================================================
+
+export interface ReflectionPromptOutput {
+  strategyId: string;
+  reflectionPrompt: string;
+  strategyName: string;
+}
+
+// ============================================================================
+// Wait Option Output (Therapist Tier — Story 5.1)
+// ============================================================================
+
+export interface WaitOptionOutput {
+  durationHours: number;
+  reasoning: string;
+}
+
+// ============================================================================
+// Wizard Option Output (Therapist Tier — Story 5.5)
+// ============================================================================
+
+export interface WizardOptionOutput {
+  wizardAvailable: boolean;
+  reasoning: string;
+}
+
+// ============================================================================
+// Wizard Response (Therapist Tier — Story 5.5)
+// ============================================================================
+
+export interface WizardResponse {
+  step: number;
+  question: string;
+  answer: string;
 }

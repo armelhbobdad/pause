@@ -8,6 +8,11 @@ const mocks = vi.hoisted(() => {
   const mockAfter = vi.fn();
   const mockSearchCoupons = vi.fn();
 
+  const mockCreateBannedTermFilter = vi.fn(
+    (_onReplacements: (r: unknown[]) => void) =>
+      vi.fn(() => new TransformStream())
+  );
+
   return {
     session: null as { user: { id: string } } | null,
     cardResult: [] as Array<{ id: string; userId: string }>,
@@ -26,6 +31,7 @@ const mocks = vi.hoisted(() => {
     mockUpdate,
     mockAfter,
     mockSearchCoupons,
+    mockCreateBannedTermFilter,
   };
 });
 
@@ -126,6 +132,29 @@ vi.mock("@/lib/server/guardian/tools/coupon-search", () => ({
     inputSchema: {},
     execute: mocks.mockSearchCoupons,
   },
+}));
+
+// --- Mock reflection tool ---
+vi.mock("@/lib/server/guardian/tools/reflection-prompt", () => ({
+  presentReflectionTool: {
+    description: "Present a reflective question",
+    inputSchema: {},
+    execute: vi.fn(),
+  },
+}));
+
+// --- Mock wait option tool ---
+vi.mock("@/lib/server/guardian/tools/wait-option", () => ({
+  showWaitOptionTool: {
+    description: "Offer a wait period",
+    inputSchema: {},
+    execute: vi.fn(),
+  },
+}));
+
+// --- Mock banned term filter ---
+vi.mock("@/lib/server/guardian/filters", () => ({
+  createBannedTermFilter: mocks.mockCreateBannedTermFilter,
 }));
 
 // --- Mock coupon provider ---
@@ -1256,8 +1285,8 @@ describe("Guardian Route Handler", () => {
       expect(stepResult).toEqual({});
     });
 
-    // Test 6.7: prepareStep returns empty object for therapist
-    it("prepareStep returns empty object when tier is therapist", async () => {
+    // Test 6.7: prepareStep returns therapist tools for therapist tier (Story 5.1)
+    it("prepareStep returns activeTools with present_reflection and show_wait_option when tier is therapist", async () => {
       const { assessRisk } = await import("@/lib/server/guardian/risk");
       vi.mocked(assessRisk).mockResolvedValueOnce({
         score: 80,
@@ -1275,7 +1304,10 @@ describe("Guardian Route Handler", () => {
         | undefined;
       expect(prepareStep).toBeDefined();
       const stepResult = prepareStep?.();
-      expect(stepResult).toEqual({});
+      expect(stepResult).toEqual({
+        toolCallStreaming: true,
+        activeTools: ["present_reflection", "show_wait_option"],
+      });
     });
 
     // Test: streamText receives tools parameter with search_coupons
@@ -1312,6 +1344,180 @@ describe("Guardian Route Handler", () => {
       const { stepCountIs } = await import("ai");
       await POST(createRequest(validBody));
       expect(stepCountIs).toHaveBeenCalledWith(5);
+    });
+  });
+
+  // ========================================================================
+  // Therapist Reflection Tools (Story 5.1)
+  // ========================================================================
+
+  describe("therapist reflection tools (Story 5.1)", () => {
+    it("streamText receives tools parameter with present_reflection tool", async () => {
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: expect.objectContaining({
+            present_reflection: expect.objectContaining({
+              description: expect.any(String),
+            }),
+          }),
+        })
+      );
+    });
+
+    it("streamText receives tools parameter with show_wait_option tool", async () => {
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: expect.objectContaining({
+            show_wait_option: expect.objectContaining({
+              description: expect.any(String),
+            }),
+          }),
+        })
+      );
+    });
+
+    it("therapist tools are NOT in activeTools when tier is negotiator", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 50,
+        factors: [],
+        reasoning: "test-negotiator",
+        historyAvailable: true,
+      });
+
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      const call = vi.mocked(streamText).mock.calls[0]?.[0];
+      const prepareStep = call?.prepareStep as
+        | (() => Record<string, unknown>)
+        | undefined;
+      const stepResult = prepareStep?.() as {
+        activeTools?: string[];
+      };
+      expect(stepResult.activeTools).toEqual(["search_coupons"]);
+      expect(stepResult.activeTools).not.toContain("present_reflection");
+      expect(stepResult.activeTools).not.toContain("show_wait_option");
+    });
+
+    it("therapist tier uses stepCountIs(5) (not auto-approved)", async () => {
+      const { assessRisk } = await import("@/lib/server/guardian/risk");
+      vi.mocked(assessRisk).mockResolvedValueOnce({
+        score: 80,
+        factors: [],
+        reasoning: "test-therapist",
+        historyAvailable: true,
+      });
+      const { stepCountIs } = await import("ai");
+      await POST(createRequest(validBody));
+      expect(stepCountIs).toHaveBeenCalledWith(5);
+    });
+  });
+
+  // ========================================================================
+  // Banned Terminology Guardrail (Story 5.4)
+  // ========================================================================
+
+  describe("banned terminology guardrail (Story 5.4)", () => {
+    it("passes experimental_transform to streamText as a function (AC#3, #9)", async () => {
+      const { streamText } = await import("ai");
+      await POST(createRequest(validBody));
+
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          experimental_transform: expect.any(Function),
+        })
+      );
+    });
+
+    it("uses createBannedTermFilter as the experimental_transform value (AC#9)", async () => {
+      await POST(createRequest(validBody));
+      expect(mocks.mockCreateBannedTermFilter).toHaveBeenCalledWith(
+        expect.any(Function)
+      );
+    });
+
+    it("after() includes banned_terms_replaced in metadata when replacements occur (AC#4)", async () => {
+      // Override mock to invoke onReplacements callback (simulates filter catching a term)
+      mocks.mockCreateBannedTermFilter.mockImplementationOnce(
+        (
+          onReplacements: (
+            r: Array<{ original: string; replacement: string | null }>
+          ) => void
+        ) => {
+          onReplacements([{ original: "addiction", replacement: "pattern" }]);
+          return vi.fn(() => new TransformStream());
+        }
+      );
+
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      expect(updateReturn?.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: {
+            banned_terms_replaced: [
+              { original: "addiction", replacement: "pattern" },
+            ],
+          },
+        })
+      );
+    });
+
+    it("after() logs console.warn when banned terms are replaced (AC#4)", async () => {
+      const consoleSpy = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+
+      mocks.mockCreateBannedTermFilter.mockImplementationOnce(
+        (
+          onReplacements: (
+            r: Array<{ original: string; replacement: string | null }>
+          ) => void
+        ) => {
+          onReplacements([{ original: "therapy", replacement: "support" }]);
+          return vi.fn(() => new TransformStream());
+        }
+      );
+
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "[Guardian] Banned term replaced in interaction"
+        )
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("after() does NOT include metadata when no replacements occur", async () => {
+      await POST(createRequest(validBody));
+
+      const callback = mocks.mockAfter.mock.calls[0]?.[0];
+      if (typeof callback === "function") {
+        await callback();
+      }
+
+      const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+      const setCall = updateReturn?.set.mock.calls[0]?.[0];
+      expect(setCall.metadata).toBeUndefined();
     });
   });
 });
