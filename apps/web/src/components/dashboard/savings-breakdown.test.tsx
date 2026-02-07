@@ -40,7 +40,10 @@ describe("SavingsBreakdown", () => {
 
     expect(screen.getByTestId("savings-breakdown-empty")).toBeInTheDocument();
     expect(
-      screen.getByText("Savings will accumulate as you use the Guardian.")
+      screen.getByText("Savings will accumulate as you use the Guardian")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Every spend triggers a check.")
     ).toBeInTheDocument();
   });
 

@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { formatRelativeTime } from "@/lib/format";
 
+import { HistoryEmptyState } from "./empty-states";
+
 interface Interaction {
   id: string;
   tier: string;
@@ -28,11 +30,8 @@ export function RecentInteractions({ interactions }: RecentInteractionsProps) {
 
   if (interactions.length === 0) {
     return (
-      <div
-        className="py-6 text-center text-muted-foreground text-sm"
-        data-testid="empty-interactions"
-      >
-        No interactions yet. Your Guardian is standing by.
+      <div data-testid="empty-interactions">
+        <HistoryEmptyState />
       </div>
     );
   }

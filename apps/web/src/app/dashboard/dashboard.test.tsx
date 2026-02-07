@@ -234,4 +234,56 @@ describe("Dashboard", () => {
 
     expect(screen.queryByTestId("savings-counter")).not.toBeInTheDocument();
   });
+
+  it("shows onboarding prompt for new user with no interactions", () => {
+    mocks.dashboardResult.data = {
+      interactionCount: 0,
+      totalSavedCents: 0,
+      acceptanceRate: 0,
+      recentInteractions: [],
+    };
+
+    renderDashboard();
+
+    const prompt = screen.getByTestId("onboarding-prompt");
+    expect(prompt).toBeInTheDocument();
+    expect(prompt).toHaveTextContent("Tap to meet your Guardian");
+  });
+
+  it("hides onboarding prompt when user has interactions", () => {
+    mocks.dashboardResult.data = {
+      interactionCount: 3,
+      totalSavedCents: 1500,
+      acceptanceRate: 66.7,
+      recentInteractions: [
+        {
+          id: "int-1",
+          tier: "analyst",
+          outcome: "accepted",
+          reasoningSummary: null,
+          createdAt: new Date("2026-02-08"),
+          cardLastFour: "1234",
+        },
+      ],
+    };
+
+    renderDashboard();
+
+    expect(screen.queryByTestId("onboarding-prompt")).not.toBeInTheDocument();
+  });
+
+  it("renders empty interactions with HistoryEmptyState component", () => {
+    mocks.dashboardResult.data = {
+      interactionCount: 0,
+      totalSavedCents: 0,
+      acceptanceRate: 0,
+      recentInteractions: [],
+    };
+
+    renderDashboard();
+
+    expect(
+      screen.getByText("No unlock requests yet. Tap your card to try it out!")
+    ).toBeInTheDocument();
+  });
 });

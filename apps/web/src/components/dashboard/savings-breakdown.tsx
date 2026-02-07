@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 
+import { SavingsEmptyState } from "./empty-states";
+
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -36,13 +38,9 @@ export function SavingsBreakdown({
 
   if (dealCount === 0) {
     return (
-      <Card className="rounded-2xl p-4" data-testid="savings-breakdown-empty">
-        <CardContent className="p-0">
-          <span className="text-muted-foreground text-sm">
-            Savings will accumulate as you use the Guardian.
-          </span>
-        </CardContent>
-      </Card>
+      <div data-testid="savings-breakdown-empty">
+        <SavingsEmptyState />
+      </div>
     );
   }
 

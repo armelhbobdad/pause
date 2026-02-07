@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { HistoryEmptyState } from "./empty-states";
 import { InteractionDetail } from "./interaction-detail";
 import { InteractionRow } from "./interaction-row";
 
@@ -119,12 +120,8 @@ export function InteractionHistoryList() {
 
   if (interactions.length === 0) {
     return (
-      <div
-        className="py-6 text-center text-muted-foreground text-sm"
-        data-testid="interaction-empty"
-        ref={mountRef}
-      >
-        No unlock requests yet. Tap your card to try it out!
+      <div data-testid="interaction-empty" ref={mountRef}>
+        <HistoryEmptyState />
       </div>
     );
   }

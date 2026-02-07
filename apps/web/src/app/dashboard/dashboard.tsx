@@ -10,6 +10,7 @@ import { SavingsSummary } from "@/components/dashboard/savings-summary";
 import { GhostCardFeed } from "@/components/guardian/ghost-card-feed";
 import { GhostCardManagerProvider } from "@/components/guardian/ghost-card-manager";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFirstInteractionCelebration } from "@/hooks/use-first-interaction-celebration";
 import { trpc } from "@/utils/trpc";
 
 function DashboardSkeleton() {
@@ -35,6 +36,10 @@ export default function Dashboard() {
     ...trpc.savings.getSummary.queryOptions(),
     staleTime: 30_000,
   });
+
+  const celebrating = useFirstInteractionCelebration(
+    data?.interactionCount ?? 0
+  );
 
   useEffect(() => {
     if (error) {
@@ -70,15 +75,42 @@ export default function Dashboard() {
     return null;
   }
 
+  const isNewUser = data.interactionCount === 0;
+
   return (
     <div className="flex h-full flex-col">
       {/* Card Vault area (~40vh) — read-only resting state */}
-      <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
         <div className="text-muted-foreground text-sm">Card Vault</div>
+        {(isNewUser || celebrating) && (
+          <p
+            className="text-muted-foreground text-sm"
+            data-celebrate={celebrating || undefined}
+            data-testid="onboarding-prompt"
+            style={{
+              opacity: celebrating ? 0 : 0.8,
+              transition: celebrating
+                ? "opacity 0.5s var(--ease-out-expo)"
+                : undefined,
+            }}
+          >
+            Tap to meet your Guardian
+          </p>
+        )}
       </div>
 
       {/* Scrollable feed (~60vh) */}
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
+      <div
+        className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4"
+        data-celebrate={celebrating || undefined}
+        style={
+          celebrating
+            ? {
+                animation: "celebrate-pulse 0.3s ease-out",
+              }
+            : undefined
+        }
+      >
         <SavingsSummary
           acceptanceRate={data.acceptanceRate}
           interactionCount={data.interactionCount}

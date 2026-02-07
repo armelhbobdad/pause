@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { GhostFeedEmptyState } from "@/components/dashboard/empty-states";
+
 import type { GhostCardProps } from "./ghost-card";
 import { GhostCard } from "./ghost-card";
 import { useGhostCardManager } from "./ghost-card-manager";
@@ -100,62 +102,10 @@ function FeedSkeleton() {
   );
 }
 
-function EmptyState() {
+function FeedEmptyState() {
   return (
-    <div
-      data-testid="ghost-feed-empty"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "0.75rem",
-        padding: "2rem 1rem",
-        textAlign: "center",
-      }}
-    >
-      <div
-        aria-hidden="true"
-        style={{
-          fontSize: "2rem",
-          opacity: 0.6,
-        }}
-      >
-        <svg
-          aria-hidden="true"
-          fill="none"
-          height="48"
-          viewBox="0 0 48 48"
-          width="48"
-        >
-          <circle
-            cx="24"
-            cy="24"
-            opacity="0.3"
-            r="20"
-            stroke="currentColor"
-            strokeDasharray="4 4"
-            strokeWidth="2"
-          />
-          <path
-            d="M18 24h12M24 18v12"
-            opacity="0.4"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="2"
-          />
-        </svg>
-      </div>
-      <p
-        style={{
-          fontFamily: "var(--font-conversation)",
-          fontSize: "0.9375rem",
-          color: "oklch(0.65 0.02 250)",
-          lineHeight: 1.5,
-          maxWidth: "280px",
-        }}
-      >
-        Your spending reflections will appear here
-      </p>
+    <div data-testid="ghost-feed-empty">
+      <GhostFeedEmptyState />
     </div>
   );
 }
@@ -315,7 +265,7 @@ export function GhostCardFeed({
       style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
     >
       {isLoading && <FeedSkeleton />}
-      {showEmpty && <EmptyState />}
+      {showEmpty && <FeedEmptyState />}
       {!isLoading &&
         mappedCards.map((props) => (
           <GhostCard

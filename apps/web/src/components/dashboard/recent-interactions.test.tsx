@@ -80,9 +80,10 @@ describe("RecentInteractions", () => {
   it("renders empty state", () => {
     render(<RecentInteractions interactions={[]} />);
 
-    expect(screen.getByTestId("empty-interactions")).toHaveTextContent(
-      "No interactions yet. Your Guardian is standing by."
-    );
+    expect(screen.getByTestId("empty-interactions")).toBeInTheDocument();
+    expect(
+      screen.getByText("No unlock requests yet. Tap your card to try it out!")
+    ).toBeInTheDocument();
   });
 
   it("expandable detail shows reasoningSummary", async () => {

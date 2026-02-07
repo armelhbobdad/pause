@@ -139,9 +139,21 @@
   }
 }
 
+/* First-Interaction Celebration Pulse (Story 7.5, AC#4)
+   Gentle scale pulse on newly populated sections — GPU-composited only (UX-37) */
+@keyframes celebrate-pulse {
+  0% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 /* Ghost Card reduced-motion: instant de-frost (Story 6.4, AC4) */
 @media (prefers-reduced-motion: reduce) {
-  [data-ghost-id] {
+  [data-ghost-id],
+  [data-celebrate] {
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
   }
