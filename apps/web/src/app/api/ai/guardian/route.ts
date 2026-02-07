@@ -138,6 +138,7 @@ export async function POST(req: Request) {
         riskScore: riskResult.score,
         status: "pending",
         outcome: null,
+        metadata: purchaseContext ? { purchaseContext } : null,
       }),
       DB_TIMEOUT_MS
     );
@@ -269,6 +270,7 @@ export async function POST(req: Request) {
             reasoningSummary,
             ...(bannedTermReplacements.length > 0 && {
               metadata: {
+                ...(purchaseContext ? { purchaseContext } : {}),
                 banned_terms_replaced: bannedTermReplacements.map((r) => ({
                   original: r.original,
                   replacement: r.replacement,

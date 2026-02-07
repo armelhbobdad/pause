@@ -3,7 +3,13 @@ import { db } from "@pause/db";
 import { interaction } from "@pause/db/schema";
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import z from "zod";
+import {
+  attachReflectionToTrace,
+  markLearningComplete,
+  runReflection,
+} from "@/lib/server/learning";
 import { withTimeout } from "@/lib/server/utils";
 
 export const runtime = "nodejs";
@@ -35,6 +41,57 @@ const requestSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+/** Outcomes that represent meaningful user behavioral signals for learning.
+ * Note: wizard_bookmark/wizard_abandoned flow through the wizard route directly,
+ * not via this feedback route — they'll need their own learning trigger. */
+const LEARNABLE_OUTCOMES = ["accepted", "overridden", "wait", "abandoned"];
+
+/** Runs the learning pipeline stages after feedback is recorded (Story 6.2) */
+async function runLearningPipeline(params: {
+  interactionId: string;
+  userId: string;
+  metadata: unknown;
+  reasoningSummary: string | null;
+  outcome: string;
+}) {
+  const meta = (params.metadata ?? {}) as Record<string, unknown>;
+  const purchaseCtx =
+    typeof meta.purchaseContext === "string"
+      ? meta.purchaseContext
+      : "unlock request";
+
+  const result = await runReflection({
+    interactionId: params.interactionId,
+    userId: params.userId,
+    question: purchaseCtx,
+    generatorAnswer: params.reasoningSummary ?? "",
+    outcome: params.outcome,
+  });
+
+  if (!result) {
+    return;
+  }
+
+  // Opik trace attachment and status update run independently via Promise.allSettled
+  const [opikResult, statusResult] = await Promise.allSettled([
+    attachReflectionToTrace(params.interactionId, result.reflectionOutput),
+    markLearningComplete(params.interactionId),
+  ]);
+
+  if (opikResult.status === "rejected") {
+    console.warn(
+      `[Feedback] Opik trace attachment failed for ${params.interactionId}:`,
+      opikResult.reason
+    );
+  }
+  if (statusResult.status === "rejected") {
+    console.warn(
+      `[Feedback] Status update failed for ${params.interactionId}:`,
+      statusResult.reason
+    );
+  }
+}
+
 export async function POST(req: Request) {
   // --- Auth check ---
   const session = await auth.api.getSession({ headers: await headers() });
@@ -63,6 +120,8 @@ export async function POST(req: Request) {
         status: string;
         outcome: string | null;
         metadata: unknown;
+        reasoningSummary: string | null;
+        tier: string;
       }
     | undefined;
   try {
@@ -74,6 +133,8 @@ export async function POST(req: Request) {
           status: interaction.status,
           outcome: interaction.outcome,
           metadata: interaction.metadata,
+          reasoningSummary: interaction.reasoningSummary,
+          tier: interaction.tier,
         })
         .from(interaction)
         .where(eq(interaction.id, parsed.data.interactionId))
@@ -130,6 +191,20 @@ export async function POST(req: Request) {
     return Response.json(
       { error: "Failed to update interaction" },
       { status: 500 }
+    );
+  }
+
+  // --- Trigger learning pipeline in after() callback (Story 6.2) ---
+  const interactionId = parsed.data.interactionId;
+  if (LEARNABLE_OUTCOMES.includes(mappedOutcome)) {
+    after(() =>
+      runLearningPipeline({
+        interactionId,
+        userId: session.user.id,
+        metadata: existingInteraction.metadata,
+        reasoningSummary: existingInteraction.reasoningSummary,
+        outcome: mappedOutcome,
+      })
     );
   }
 
