@@ -1,0 +1,434 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// --- Hoisted mocks for configurable test state ---
+const mocks = vi.hoisted(() => {
+  const mockSelect = vi.fn();
+  const mockUpdate = vi.fn();
+
+  return {
+    session: null as { user: { id: string } } | null,
+    interactionResult: [] as Array<{
+      id: string;
+      userId: string;
+      status: string;
+      outcome: string | null;
+      metadata: Record<string, unknown> | null;
+    }>,
+    selectError: null as Error | null,
+    updateError: null as Error | null,
+    mockSelect,
+    mockUpdate,
+  };
+});
+
+// --- Mock server-only ---
+vi.mock("server-only", () => ({}));
+
+// --- Mock next/headers ---
+vi.mock("next/headers", () => ({
+  headers: () => Promise.resolve(new Headers()),
+}));
+
+// --- Mock @pause/auth ---
+vi.mock("@pause/auth", () => ({
+  auth: {
+    api: {
+      getSession: () => Promise.resolve(mocks.session),
+    },
+  },
+}));
+
+// --- Shared mock chain setup (used by vi.mock factory and beforeEach) ---
+function setupMockChains() {
+  const selectChain = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn(() => {
+      if (mocks.selectError) {
+        return Promise.reject(mocks.selectError);
+      }
+      return Promise.resolve(mocks.interactionResult);
+    }),
+  };
+
+  const updateChain = {
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn(() => {
+      if (mocks.updateError) {
+        return Promise.reject(mocks.updateError);
+      }
+      return Promise.resolve();
+    }),
+  };
+
+  mocks.mockSelect.mockReturnValue(selectChain);
+  mocks.mockUpdate.mockReturnValue(updateChain);
+}
+
+// --- Mock @pause/db ---
+vi.mock("@pause/db", () => {
+  setupMockChains();
+  return {
+    db: {
+      select: mocks.mockSelect,
+      update: mocks.mockUpdate,
+    },
+  };
+});
+
+vi.mock("@pause/db/schema", () => ({
+  interaction: {
+    id: "interaction.id",
+    userId: "interaction.userId",
+    status: "interaction.status",
+    outcome: "interaction.outcome",
+    metadata: "interaction.metadata",
+  },
+}));
+
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn((a: unknown, b: unknown) => ({ eq: [a, b] })),
+}));
+
+vi.mock("@/lib/server/utils", () => ({
+  withTimeout: vi.fn(<T>(promise: Promise<T>, _ms: number) => promise),
+}));
+
+// --- Import the route handler ---
+import { POST } from "./route";
+
+function createRequest(body: Record<string, unknown>): Request {
+  return new Request("http://localhost/api/ai/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+const validBody = {
+  interactionId: "int-123",
+  outcome: "accepted",
+};
+
+describe("Feedback Recording Route Handler", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.session = { user: { id: "user-1" } };
+    mocks.interactionResult = [
+      {
+        id: "int-123",
+        userId: "user-1",
+        status: "completed",
+        outcome: null,
+        metadata: null,
+      },
+    ];
+    mocks.selectError = null;
+    mocks.updateError = null;
+    setupMockChains();
+  });
+
+  // ========================================================================
+  // Authentication (AC2)
+  // ========================================================================
+
+  it("returns 401 for unauthenticated request", async () => {
+    mocks.session = null;
+    const response = await POST(createRequest(validBody));
+    expect(response.status).toBe(401);
+    const data = await response.json();
+    expect(data).toEqual({ error: "Unauthorized" });
+  });
+
+  // ========================================================================
+  // Request Validation (AC1)
+  // ========================================================================
+
+  it("returns 400 for missing interactionId", async () => {
+    const response = await POST(createRequest({ outcome: "accepted" }));
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data).toEqual({ error: "Invalid request body" });
+  });
+
+  it("returns 400 for invalid outcome value", async () => {
+    const response = await POST(
+      createRequest({ interactionId: "int-123", outcome: "invalid_outcome" })
+    );
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data).toEqual({ error: "Invalid request body" });
+  });
+
+  it("returns 400 for invalid JSON body", async () => {
+    const req = new Request("http://localhost/api/ai/feedback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "not-json",
+    });
+    const response = await POST(req);
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data).toEqual({ error: "Invalid JSON" });
+  });
+
+  // ========================================================================
+  // Interaction Lookup (AC3)
+  // ========================================================================
+
+  it("returns 404 when interaction not found", async () => {
+    mocks.interactionResult = [];
+    const response = await POST(createRequest(validBody));
+    expect(response.status).toBe(404);
+    const data = await response.json();
+    expect(data).toEqual({ error: "Interaction not found" });
+  });
+
+  // ========================================================================
+  // Authorization Guard (AC4)
+  // ========================================================================
+
+  it("returns 403 when interaction belongs to different user", async () => {
+    mocks.interactionResult = [
+      {
+        id: "int-123",
+        userId: "other-user",
+        status: "completed",
+        outcome: null,
+        metadata: null,
+      },
+    ];
+    const response = await POST(createRequest(validBody));
+    expect(response.status).toBe(403);
+    const data = await response.json();
+    expect(data).toEqual({ error: "Forbidden" });
+  });
+
+  // ========================================================================
+  // Success — First Feedback (AC6, AC7)
+  // ========================================================================
+
+  it("returns 200 with feedbackId for first-time feedback", async () => {
+    const response = await POST(createRequest(validBody));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data).toEqual({
+      success: true,
+      feedbackId: "int-123",
+    });
+  });
+
+  it("maps outcome 'override' to DB enum 'overridden'", async () => {
+    const response = await POST(
+      createRequest({ interactionId: "int-123", outcome: "override" })
+    );
+    expect(response.status).toBe(200);
+
+    expect(mocks.mockUpdate).toHaveBeenCalled();
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "overridden" })
+    );
+  });
+
+  it("maps outcome 'skipped_savings' to DB enum 'overridden'", async () => {
+    const response = await POST(
+      createRequest({ interactionId: "int-123", outcome: "skipped_savings" })
+    );
+    expect(response.status).toBe(200);
+
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "overridden" })
+    );
+  });
+
+  it("maps outcome 'accepted_savings' to DB enum 'accepted'", async () => {
+    const response = await POST(
+      createRequest({ interactionId: "int-123", outcome: "accepted_savings" })
+    );
+    expect(response.status).toBe(200);
+
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "accepted" })
+    );
+  });
+
+  it("maps outcome 'wait' to DB enum 'wait'", async () => {
+    const response = await POST(
+      createRequest({ interactionId: "int-123", outcome: "wait" })
+    );
+    expect(response.status).toBe(200);
+
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "wait" })
+    );
+  });
+
+  it("maps outcome 'abandoned' to DB enum 'abandoned'", async () => {
+    const response = await POST(
+      createRequest({ interactionId: "int-123", outcome: "abandoned" })
+    );
+    expect(response.status).toBe(200);
+
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "abandoned" })
+    );
+  });
+
+  it("sets status to 'feedback_received' on update", async () => {
+    const response = await POST(createRequest(validBody));
+    expect(response.status).toBe(200);
+
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "feedback_received" })
+    );
+  });
+
+  // ========================================================================
+  // Upsert — Existing Outcome (AC5)
+  // ========================================================================
+
+  it("returns 200 with updated:true when outcome already existed", async () => {
+    mocks.interactionResult = [
+      {
+        id: "int-123",
+        userId: "user-1",
+        status: "feedback_received",
+        outcome: "accepted",
+        metadata: null,
+      },
+    ];
+    const response = await POST(
+      createRequest({ interactionId: "int-123", outcome: "override" })
+    );
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data).toEqual({
+      success: true,
+      feedbackId: "int-123",
+      updated: true,
+    });
+  });
+
+  // ========================================================================
+  // Metadata Merge (AC8)
+  // ========================================================================
+
+  it("stores metadata when no existing metadata", async () => {
+    const response = await POST(
+      createRequest({
+        interactionId: "int-123",
+        outcome: "accepted",
+        metadata: { reason: "good deal" },
+      })
+    );
+    expect(response.status).toBe(200);
+
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: { reason: "good deal" },
+      })
+    );
+  });
+
+  it("merges metadata with existing metadata", async () => {
+    mocks.interactionResult = [
+      {
+        id: "int-123",
+        userId: "user-1",
+        status: "completed",
+        outcome: null,
+        metadata: { existingKey: "existingValue" },
+      },
+    ];
+    const response = await POST(
+      createRequest({
+        interactionId: "int-123",
+        outcome: "accepted",
+        metadata: { newKey: "newValue" },
+      })
+    );
+    expect(response.status).toBe(200);
+
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: { existingKey: "existingValue", newKey: "newValue" },
+      })
+    );
+  });
+
+  it("preserves existing metadata when no new metadata provided", async () => {
+    mocks.interactionResult = [
+      {
+        id: "int-123",
+        userId: "user-1",
+        status: "completed",
+        outcome: null,
+        metadata: { existingKey: "existingValue" },
+      },
+    ];
+    const response = await POST(createRequest(validBody));
+    expect(response.status).toBe(200);
+
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: { existingKey: "existingValue" },
+      })
+    );
+  });
+
+  it("treats empty metadata object as no metadata", async () => {
+    mocks.interactionResult = [
+      {
+        id: "int-123",
+        userId: "user-1",
+        status: "completed",
+        outcome: null,
+        metadata: { existingKey: "existingValue" },
+      },
+    ];
+    const response = await POST(
+      createRequest({
+        interactionId: "int-123",
+        outcome: "accepted",
+        metadata: {},
+      })
+    );
+    expect(response.status).toBe(200);
+
+    const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
+    expect(updateReturn?.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: { existingKey: "existingValue" },
+      })
+    );
+  });
+
+  // ========================================================================
+  // Database Errors (500)
+  // ========================================================================
+
+  it("returns 500 on database select error", async () => {
+    mocks.selectError = new Error("Operation timed out");
+    const response = await POST(createRequest(validBody));
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data).toEqual({ error: "Database error" });
+  });
+
+  it("returns 500 on database update error", async () => {
+    mocks.updateError = new Error("DB update failed");
+    const response = await POST(createRequest(validBody));
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data).toEqual({ error: "Failed to update interaction" });
+  });
+});
