@@ -6,6 +6,10 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import z from "zod";
 import {
+  createGhostCard,
+  GHOST_QUALIFYING_OUTCOMES,
+} from "@/lib/server/ghost-cards";
+import {
   attachReflectionToTrace,
   markLearningComplete,
   runReflection,
@@ -198,8 +202,22 @@ export async function POST(req: Request) {
     );
   }
 
-  // --- Trigger learning pipeline in after() callback (Story 6.2) ---
+  // --- Ghost card creation — fire-and-forget, non-blocking (Story 6.4) ---
   const interactionId = parsed.data.interactionId;
+  if (
+    GHOST_QUALIFYING_OUTCOMES.includes(
+      mappedOutcome as (typeof GHOST_QUALIFYING_OUTCOMES)[number]
+    )
+  ) {
+    createGhostCard({
+      interactionId,
+      userId: session.user.id,
+    }).catch((error) => {
+      console.warn(`[Ghost] Card creation failed for ${interactionId}:`, error);
+    });
+  }
+
+  // --- Trigger learning pipeline in after() callback (Story 6.2) ---
   if (LEARNABLE_OUTCOMES.includes(mappedOutcome)) {
     after(() =>
       runLearningPipeline({

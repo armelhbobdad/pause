@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
   const mockAttachReflectionToTrace = vi.fn();
   const mockMarkLearningComplete = vi.fn();
   const mockRunSkillUpdate = vi.fn();
+  const mockCreateGhostCard = vi.fn();
 
   return {
     session: null as { user: { id: string } } | null,
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => {
     mockAttachReflectionToTrace,
     mockMarkLearningComplete,
     mockRunSkillUpdate,
+    mockCreateGhostCard,
   };
 });
 
@@ -123,6 +125,17 @@ vi.mock("@/lib/server/learning", () => ({
   runSkillUpdate: mocks.mockRunSkillUpdate,
 }));
 
+// --- Mock ghost cards module (Story 6.4) ---
+vi.mock("@/lib/server/ghost-cards", () => ({
+  createGhostCard: mocks.mockCreateGhostCard,
+  GHOST_QUALIFYING_OUTCOMES: [
+    "accepted",
+    "overridden",
+    "wait",
+    "auto_approved",
+  ],
+}));
+
 // --- Import the route handler ---
 import { POST } from "./route";
 
@@ -161,6 +174,7 @@ describe("Feedback Recording Route Handler", () => {
     mocks.mockAttachReflectionToTrace.mockResolvedValue(undefined);
     mocks.mockMarkLearningComplete.mockResolvedValue(undefined);
     mocks.mockRunSkillUpdate.mockResolvedValue(null);
+    mocks.mockCreateGhostCard.mockResolvedValue(undefined);
     setupMockChains();
   });
 
@@ -690,6 +704,94 @@ describe("Feedback Recording Route Handler", () => {
       // Pipeline should still call trace attachment and mark complete
       expect(mocks.mockAttachReflectionToTrace).toHaveBeenCalled();
       expect(mocks.mockMarkLearningComplete).toHaveBeenCalled();
+    });
+  });
+
+  // ========================================================================
+  // Story 6.4: Ghost Card Creation in Feedback Flow
+  // ========================================================================
+
+  describe("Ghost Card Creation (Story 6.4)", () => {
+    it("calls createGhostCard for qualifying outcome 'accepted'", async () => {
+      await POST(createRequest(validBody));
+
+      expect(mocks.mockCreateGhostCard).toHaveBeenCalledWith({
+        interactionId: "int-123",
+        userId: "user-1",
+      });
+    });
+
+    it("calls createGhostCard for qualifying outcome 'overridden' (via 'override')", async () => {
+      await POST(
+        createRequest({ interactionId: "int-123", outcome: "override" })
+      );
+
+      expect(mocks.mockCreateGhostCard).toHaveBeenCalledWith({
+        interactionId: "int-123",
+        userId: "user-1",
+      });
+    });
+
+    it("calls createGhostCard for qualifying outcome 'wait'", async () => {
+      await POST(createRequest({ interactionId: "int-123", outcome: "wait" }));
+
+      expect(mocks.mockCreateGhostCard).toHaveBeenCalledWith({
+        interactionId: "int-123",
+        userId: "user-1",
+      });
+    });
+
+    it("calls createGhostCard for qualifying outcome 'accepted' (via 'accepted_savings')", async () => {
+      await POST(
+        createRequest({ interactionId: "int-123", outcome: "accepted_savings" })
+      );
+
+      expect(mocks.mockCreateGhostCard).toHaveBeenCalledWith({
+        interactionId: "int-123",
+        userId: "user-1",
+      });
+    });
+
+    it("calls createGhostCard for qualifying outcome 'overridden' (via 'skipped_savings')", async () => {
+      await POST(
+        createRequest({ interactionId: "int-123", outcome: "skipped_savings" })
+      );
+
+      expect(mocks.mockCreateGhostCard).toHaveBeenCalledWith({
+        interactionId: "int-123",
+        userId: "user-1",
+      });
+    });
+
+    it("does NOT call createGhostCard for non-qualifying outcome 'abandoned'", async () => {
+      await POST(
+        createRequest({ interactionId: "int-123", outcome: "abandoned" })
+      );
+
+      expect(mocks.mockCreateGhostCard).not.toHaveBeenCalled();
+    });
+
+    it("ghost card creation failure does not affect response", async () => {
+      mocks.mockCreateGhostCard.mockRejectedValue(
+        new Error("DB insert failed")
+      );
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {
+        /* noop */
+      });
+
+      const response = await POST(createRequest(validBody));
+      expect(response.status).toBe(200);
+
+      // Wait for the fire-and-forget promise to settle
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[Ghost] Card creation failed"),
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });
