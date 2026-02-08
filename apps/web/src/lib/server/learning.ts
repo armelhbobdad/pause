@@ -243,7 +243,8 @@ export async function runSkillUpdate(
           interactionId,
           updateBatch,
           skillCountBefore,
-          skillCountAfter
+          skillCountAfter,
+          currentSkillbook
         );
         return updateBatch;
       }
@@ -265,7 +266,8 @@ export async function runSkillUpdate(
             interactionId,
             updateBatch,
             skillCountBefore,
-            skillCountAfter
+            skillCountAfter,
+            currentSkillbook
           );
           return updateBatch;
         } catch {
@@ -299,6 +301,32 @@ export async function runSkillUpdate(
 }
 
 /**
+ * Builds a snapshot of the Skillbook state for trace metadata.
+ * Includes active skill count by section and aggregate helpful/harmful/neutral totals.
+ */
+function buildSkillbookSnapshot(skillbook: Skillbook): Record<string, unknown> {
+  const skills = skillbook.skills();
+  const bySection: Record<string, number> = {};
+  let totalHelpful = 0;
+  let totalHarmful = 0;
+  let totalNeutral = 0;
+
+  for (const skill of skills) {
+    bySection[skill.section] = (bySection[skill.section] ?? 0) + 1;
+    totalHelpful += skill.helpful ?? 0;
+    totalHarmful += skill.harmful ?? 0;
+    totalNeutral += skill.neutral ?? 0;
+  }
+
+  return {
+    activeSkillsBySection: bySection,
+    totalHelpful,
+    totalHarmful,
+    totalNeutral,
+  };
+}
+
+/**
  * Creates a learning:skillbook_update Opik trace (AC5).
  * Fire-and-forget — errors are logged but don't affect the pipeline.
  */
@@ -306,12 +334,19 @@ export function attachSkillUpdateToTrace(
   interactionId: string,
   updateBatch: UpdateBatch,
   skillCountBefore: number,
-  skillCountAfter: number
+  skillCountAfter: number,
+  skillbook?: Skillbook
 ): void {
   try {
     const client = getOpikClient();
     if (!client) {
       return;
+    }
+
+    // Build operationsByType grouped count
+    const operationsByType: Record<string, number> = {};
+    for (const op of updateBatch.operations) {
+      operationsByType[op.type] = (operationsByType[op.type] ?? 0) + 1;
     }
 
     const learningTrace = client.trace({
@@ -321,13 +356,20 @@ export function attachSkillUpdateToTrace(
         operationCount: updateBatch.operations.length,
         skillCountBefore,
         skillCountAfter,
+        delta: skillCountAfter - skillCountBefore,
+        operationsByType,
         reasoning: updateBatch.reasoning,
         operations: updateBatch.operations.map((op) => ({
           type: op.type,
           section: op.section,
           skill_id: op.skill_id,
         })),
+        ...(skillbook
+          ? { skillbook_snapshot: buildSkillbookSnapshot(skillbook) }
+          : {}),
       },
+      tags: ["learning", "skillbook_update"],
+      metadata: { interactionId },
     });
     learningTrace.end();
     client.flush().catch(() => {
@@ -344,7 +386,8 @@ export function attachSkillUpdateToTrace(
  */
 export async function attachReflectionToTrace(
   interactionId: string,
-  reflectionOutput: ReflectorOutput
+  reflectionOutput: ReflectorOutput,
+  options?: { tier?: string; outcome?: string }
 ): Promise<void> {
   const client = getOpikClient();
   if (!client) {
@@ -352,7 +395,7 @@ export async function attachReflectionToTrace(
   }
 
   const traces = await client.searchTraces({
-    filterString: `name = "guardian-${interactionId}"`,
+    filterString: `metadata.interactionId = "${interactionId}"`,
     waitForAtLeast: 1,
     waitForTimeout: 5000,
   });
@@ -367,7 +410,11 @@ export async function attachReflectionToTrace(
         helpfulSkillIds: reflectionOutput.helpful_skill_ids,
         harmfulSkillIds: reflectionOutput.harmful_skill_ids,
         newLearningsCount: reflectionOutput.new_learnings.length,
+        ...(options?.tier ? { tier: options.tier } : {}),
+        ...(options?.outcome ? { outcome: options.outcome } : {}),
       },
+      tags: ["learning", "reflection"],
+      metadata: { interactionId },
     });
     learningTrace.end();
     await client.flush();
@@ -408,7 +455,7 @@ export async function attachSatisfactionFeedbackToTrace(
     }
 
     const traces = await client.searchTraces({
-      filterString: `name = "guardian-${interactionId}"`,
+      filterString: `metadata.interactionId = "${interactionId}"`,
       waitForAtLeast: 1,
       waitForTimeout: 5000,
     });
@@ -424,6 +471,8 @@ export async function attachSatisfactionFeedbackToTrace(
         parentTraceId: traces[0].id,
         ...metadata,
       },
+      tags: ["learning", "satisfaction_feedback"],
+      metadata: { interactionId },
     });
     learningTrace.end();
     await client.flush();

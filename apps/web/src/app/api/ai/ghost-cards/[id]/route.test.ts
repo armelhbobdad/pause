@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
   const mockUpdateSet = vi.fn();
   const mockAfter = vi.fn();
   const mockRunSatisfactionFeedbackLearning = vi.fn();
+  const mockAttachFeedbackScoreToTrace = vi.fn();
 
   return {
     session: null as { user: { id: string } } | null,
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => {
     mockUpdateSet,
     mockAfter,
     mockRunSatisfactionFeedbackLearning,
+    mockAttachFeedbackScoreToTrace,
   };
 });
 
@@ -79,6 +81,7 @@ vi.mock("@pause/db/schema", () => ({
   ghostCard: {
     id: "ghost_card.id",
     userId: "ghost_card.userId",
+    interactionId: "ghost_card.interactionId",
     satisfactionFeedback: "ghost_card.satisfactionFeedback",
     status: "ghost_card.status",
   },
@@ -95,6 +98,16 @@ vi.mock("drizzle-orm", () => ({
 // --- Mock next/server (after callback) ---
 vi.mock("next/server", () => ({
   after: mocks.mockAfter,
+}));
+
+// --- Mock opik module (Story 8.3) ---
+vi.mock("@/lib/server/opik", () => ({
+  attachFeedbackScoreToTrace: mocks.mockAttachFeedbackScoreToTrace,
+  REGRET_FREE_SCORES: {
+    worth_it: { value: 1.0, reason: "User reports purchase was worth it" },
+    regret_it: { value: 0.0, reason: "User reports regret about purchase" },
+    not_sure: null,
+  },
 }));
 
 // --- Mock learning module (Story 6.6) ---
@@ -124,9 +137,12 @@ describe("Ghost Cards PATCH Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.session = { user: { id: "user-1" } };
-    mocks.selectResult = [{ id: "gc-1", userId: "user-1" }];
+    mocks.selectResult = [
+      { id: "gc-1", userId: "user-1", interactionId: "int-456" },
+    ];
     mocks.updateError = null;
     mocks.mockRunSatisfactionFeedbackLearning.mockResolvedValue(undefined);
+    mocks.mockAttachFeedbackScoreToTrace.mockResolvedValue(undefined);
     setupSelectChain();
     setupUpdateChain();
   });
@@ -189,7 +205,9 @@ describe("Ghost Cards PATCH Route", () => {
   // ========================================================================
 
   it("returns 403 when ghost card belongs to different user", async () => {
-    mocks.selectResult = [{ id: "gc-1", userId: "other-user" }];
+    mocks.selectResult = [
+      { id: "gc-1", userId: "other-user", interactionId: "int-456" },
+    ];
     const response = await PATCH(
       createPatchRequest({ satisfactionFeedback: "worth_it" }),
       { params: createParams() }
@@ -362,5 +380,45 @@ describe("Ghost Cards PATCH Route", () => {
     });
 
     expect(mocks.mockAfter).not.toHaveBeenCalled();
+  });
+
+  // ========================================================================
+  // Story 8.3: Regret-Free Score Attachment
+  // ========================================================================
+
+  describe("Regret-Free Score Attachment (Story 8.3)", () => {
+    it("calls attachFeedbackScoreToTrace for worth_it feedback", async () => {
+      await PATCH(createPatchRequest({ satisfactionFeedback: "worth_it" }), {
+        params: createParams(),
+      });
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).toHaveBeenCalledWith(
+        "int-456",
+        "regret_free_spending",
+        1.0,
+        "User reports purchase was worth it"
+      );
+    });
+
+    it("calls attachFeedbackScoreToTrace for regret_it feedback", async () => {
+      await PATCH(createPatchRequest({ satisfactionFeedback: "regret_it" }), {
+        params: createParams(),
+      });
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).toHaveBeenCalledWith(
+        "int-456",
+        "regret_free_spending",
+        0.0,
+        "User reports regret about purchase"
+      );
+    });
+
+    it("does not call attachFeedbackScoreToTrace for not_sure feedback", async () => {
+      await PATCH(createPatchRequest({ satisfactionFeedback: "not_sure" }), {
+        params: createParams(),
+      });
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).not.toHaveBeenCalled();
+    });
   });
 });

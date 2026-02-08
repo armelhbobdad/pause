@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
   const mockMarkLearningComplete = vi.fn();
   const mockRunSkillUpdate = vi.fn();
   const mockCreateGhostCard = vi.fn();
+  const mockAttachFeedbackScoreToTrace = vi.fn();
 
   return {
     session: null as { user: { id: string } } | null,
@@ -32,6 +33,7 @@ const mocks = vi.hoisted(() => {
     mockMarkLearningComplete,
     mockRunSkillUpdate,
     mockCreateGhostCard,
+    mockAttachFeedbackScoreToTrace,
   };
 });
 
@@ -125,6 +127,21 @@ vi.mock("@/lib/server/learning", () => ({
   runSkillUpdate: mocks.mockRunSkillUpdate,
 }));
 
+// --- Mock opik module (Story 8.3) ---
+vi.mock("@/lib/server/opik", () => ({
+  attachFeedbackScoreToTrace: mocks.mockAttachFeedbackScoreToTrace,
+  INTERVENTION_ACCEPTANCE_SCORES: {
+    accepted: { value: 1.0, reason: "User accepted Guardian suggestion" },
+    accepted_savings: { value: 1.0, reason: "User accepted savings offer" },
+    wait: { value: 1.0, reason: "User chose to wait as suggested" },
+    skipped_savings: {
+      value: 0.5,
+      reason: "User skipped savings but accepted unlock",
+    },
+    override: { value: 0.0, reason: "User overrode Guardian intervention" },
+  },
+}));
+
 // --- Mock ghost cards module (Story 6.4) ---
 vi.mock("@/lib/server/ghost-cards", () => ({
   createGhostCard: mocks.mockCreateGhostCard,
@@ -175,6 +192,7 @@ describe("Feedback Recording Route Handler", () => {
     mocks.mockMarkLearningComplete.mockResolvedValue(undefined);
     mocks.mockRunSkillUpdate.mockResolvedValue(null);
     mocks.mockCreateGhostCard.mockResolvedValue(undefined);
+    mocks.mockAttachFeedbackScoreToTrace.mockResolvedValue(undefined);
     setupMockChains();
   });
 
@@ -591,7 +609,8 @@ describe("Feedback Recording Route Handler", () => {
 
       expect(mocks.mockAttachReflectionToTrace).toHaveBeenCalledWith(
         "int-123",
-        reflectionOutput
+        reflectionOutput,
+        { tier: "negotiator", outcome: "accepted" }
       );
       expect(mocks.mockMarkLearningComplete).toHaveBeenCalledWith("int-123");
     });
@@ -792,6 +811,57 @@ describe("Feedback Recording Route Handler", () => {
       );
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  // ========================================================================
+  // Story 8.3: Feedback Score Attachment
+  // ========================================================================
+
+  describe("Feedback Score Attachment (Story 8.3)", () => {
+    it("calls attachFeedbackScoreToTrace for accepted outcome", async () => {
+      await POST(createRequest(validBody));
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).toHaveBeenCalledWith(
+        "int-123",
+        "intervention_acceptance",
+        1.0,
+        "User accepted Guardian suggestion"
+      );
+    });
+
+    it("calls attachFeedbackScoreToTrace with 0.0 for override outcome", async () => {
+      await POST(
+        createRequest({ interactionId: "int-123", outcome: "override" })
+      );
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).toHaveBeenCalledWith(
+        "int-123",
+        "intervention_acceptance",
+        0.0,
+        "User overrode Guardian intervention"
+      );
+    });
+
+    it("calls attachFeedbackScoreToTrace with 0.5 for skipped_savings outcome", async () => {
+      await POST(
+        createRequest({ interactionId: "int-123", outcome: "skipped_savings" })
+      );
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).toHaveBeenCalledWith(
+        "int-123",
+        "intervention_acceptance",
+        0.5,
+        "User skipped savings but accepted unlock"
+      );
+    });
+
+    it("does not call attachFeedbackScoreToTrace for abandoned outcome", async () => {
+      await POST(
+        createRequest({ interactionId: "int-123", outcome: "abandoned" })
+      );
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).not.toHaveBeenCalled();
     });
   });
 });

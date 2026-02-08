@@ -770,14 +770,17 @@ describe("Learning Module", () => {
 
       await runSkillUpdate(pipelineResult);
 
-      expect(mocks.opikClient.trace).toHaveBeenCalledWith({
-        name: "learning:skillbook_update",
-        input: expect.objectContaining({
-          interactionId: "int-500",
-          operationCount: 1,
-          reasoning: defaultUpdateBatch.reasoning,
-        }),
-      });
+      expect(mocks.opikClient.trace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "learning:skillbook_update",
+          input: expect.objectContaining({
+            interactionId: "int-500",
+            operationCount: 1,
+            reasoning: defaultUpdateBatch.reasoning,
+          }),
+          tags: ["learning", "skillbook_update"],
+        })
+      );
       expect(mockTrace.end).toHaveBeenCalled();
     });
 
@@ -989,7 +992,7 @@ describe("Learning Module", () => {
 
       expect(mocks.opikClient.trace).toHaveBeenCalledWith({
         name: "learning:skillbook_update",
-        input: {
+        input: expect.objectContaining({
           interactionId: "int-600",
           operationCount: 1,
           skillCountBefore: 3,
@@ -1002,7 +1005,9 @@ describe("Learning Module", () => {
               skill_id: "skill-001",
             },
           ],
-        },
+        }),
+        tags: ["learning", "skillbook_update"],
+        metadata: { interactionId: "int-600" },
       });
       expect(mockTrace.end).toHaveBeenCalled();
     });
@@ -1045,18 +1050,22 @@ describe("Learning Module", () => {
       await attachReflectionToTrace("int-200", defaultReflectResult);
 
       expect(mocks.opikClient.searchTraces).toHaveBeenCalledWith({
-        filterString: 'name = "guardian-int-200"',
+        filterString: 'metadata.interactionId = "int-200"',
         waitForAtLeast: 1,
         waitForTimeout: 5000,
       });
-      expect(mocks.opikClient.trace).toHaveBeenCalledWith({
-        name: "learning:reflection",
-        input: expect.objectContaining({
-          interactionId: "int-200",
-          parentTraceId: "trace-001",
-          reflectionAnalysis: defaultReflectResult.analysis,
-        }),
-      });
+      expect(mocks.opikClient.trace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "learning:reflection",
+          input: expect.objectContaining({
+            interactionId: "int-200",
+            parentTraceId: "trace-001",
+            reflectionAnalysis: defaultReflectResult.analysis,
+          }),
+          tags: ["learning", "reflection"],
+          metadata: { interactionId: "int-200" },
+        })
+      );
       expect(mockTrace.end).toHaveBeenCalled();
       expect(mocks.opikClient.flush).toHaveBeenCalled();
     });
@@ -1118,6 +1127,29 @@ describe("Learning Module", () => {
   // ========================================================================
 
   describe("attachSatisfactionFeedbackToTrace", () => {
+    it("uses metadata-based search pattern (Story 8.2, AC#9)", async () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn().mockResolvedValue([{ id: "trace-parent" }]),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await _satTrace("int-710", {
+        satisfactionFeedback: "worth_it",
+        originalOutcome: "accepted",
+        mappedSignal: "correct",
+        reflectionAnalysis: "test",
+        newLearnings: [],
+      });
+
+      expect(mocks.opikClient.searchTraces).toHaveBeenCalledWith({
+        filterString: 'metadata.interactionId = "int-710"',
+        waitForAtLeast: 1,
+        waitForTimeout: 5000,
+      });
+    });
+
     it("creates learning:satisfaction_feedback trace with metadata", async () => {
       const mockTrace = { end: vi.fn() };
       mocks.opikClient = {
@@ -1134,16 +1166,20 @@ describe("Learning Module", () => {
         newLearnings: [{ section: "negotiation", content: "test" }],
       });
 
-      expect(mocks.opikClient.trace).toHaveBeenCalledWith({
-        name: "learning:satisfaction_feedback",
-        input: expect.objectContaining({
-          interactionId: "int-700",
-          parentTraceId: "trace-parent",
-          satisfactionFeedback: "regret_it",
-          originalOutcome: "accepted",
-          mappedSignal: "incorrect — user regrets following suggestion",
-        }),
-      });
+      expect(mocks.opikClient.trace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "learning:satisfaction_feedback",
+          input: expect.objectContaining({
+            interactionId: "int-700",
+            parentTraceId: "trace-parent",
+            satisfactionFeedback: "regret_it",
+            originalOutcome: "accepted",
+            mappedSignal: "incorrect — user regrets following suggestion",
+          }),
+          tags: ["learning", "satisfaction_feedback"],
+          metadata: { interactionId: "int-700" },
+        })
+      );
       expect(mockTrace.end).toHaveBeenCalled();
       expect(mocks.opikClient.flush).toHaveBeenCalled();
     });
@@ -1343,6 +1379,190 @@ describe("Learning Module", () => {
       );
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  // ========================================================================
+  // Story 8.5b: Learning Visualization for Judges — enriched trace metadata
+  // ========================================================================
+
+  describe("Story 8.5b: Learning trace enrichments", () => {
+    it("attachReflectionToTrace includes tier and outcome when provided", async () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn().mockResolvedValue([{ id: "trace-8b-1" }]),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await attachReflectionToTrace("int-8b-1", defaultReflectResult, {
+        tier: "therapist",
+        outcome: "overridden",
+      });
+
+      const traceCall = mocks.opikClient.trace.mock.calls[0][0];
+      expect(traceCall.input.tier).toBe("therapist");
+      expect(traceCall.input.outcome).toBe("overridden");
+    });
+
+    it("attachReflectionToTrace includes tags and metadata with interactionId", async () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn().mockResolvedValue([{ id: "trace-8b-2" }]),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await attachReflectionToTrace("int-8b-2", defaultReflectResult);
+
+      const traceCall = mocks.opikClient.trace.mock.calls[0][0];
+      expect(traceCall.tags).toEqual(["learning", "reflection"]);
+      expect(traceCall.metadata).toEqual({ interactionId: "int-8b-2" });
+    });
+
+    it("attachSkillUpdateToTrace includes delta and operationsByType", () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn(),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const batchWithMixedOps = {
+        reasoning: "Multiple operations",
+        operations: [
+          {
+            type: "ADD" as const,
+            section: "future_self",
+            content: "new skill",
+          },
+          {
+            type: "TAG" as const,
+            section: "negotiation",
+            skill_id: "s-1",
+            metadata: { helpful: 1 },
+          },
+          {
+            type: "TAG" as const,
+            section: "negotiation",
+            skill_id: "s-2",
+            metadata: { harmful: 1 },
+          },
+        ],
+      };
+
+      attachSkillUpdateToTrace(
+        "int-8b-3",
+        batchWithMixedOps as import("@pause/ace").UpdateBatch,
+        5,
+        6
+      );
+
+      const traceCall = mocks.opikClient.trace.mock.calls[0][0];
+      expect(traceCall.input.delta).toBe(1);
+      expect(traceCall.input.operationsByType).toEqual({ ADD: 1, TAG: 2 });
+    });
+
+    it("attachSkillUpdateToTrace includes skillbook_snapshot when skillbook provided", () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn(),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const mockSkillbook = {
+        skills: vi.fn(() => [
+          {
+            id: "s1",
+            section: "future_self",
+            content: "test",
+            helpful: 3,
+            harmful: 1,
+            neutral: 0,
+            created_at: "",
+            updated_at: "",
+            status: "active" as const,
+          },
+          {
+            id: "s2",
+            section: "future_self",
+            content: "test2",
+            helpful: 1,
+            harmful: 0,
+            neutral: 2,
+            created_at: "",
+            updated_at: "",
+            status: "active" as const,
+          },
+          {
+            id: "s3",
+            section: "cost_analysis",
+            content: "test3",
+            helpful: 2,
+            harmful: 2,
+            neutral: 1,
+            created_at: "",
+            updated_at: "",
+            status: "active" as const,
+          },
+        ]),
+        asPrompt: () => "",
+        applyUpdate: vi.fn(),
+        toDict: vi.fn(),
+      } as never;
+
+      attachSkillUpdateToTrace(
+        "int-8b-4",
+        defaultUpdateBatch,
+        2,
+        3,
+        mockSkillbook
+      );
+
+      const traceCall = mocks.opikClient.trace.mock.calls[0][0];
+      expect(traceCall.input.skillbook_snapshot).toEqual({
+        activeSkillsBySection: { future_self: 2, cost_analysis: 1 },
+        totalHelpful: 6,
+        totalHarmful: 3,
+        totalNeutral: 3,
+      });
+    });
+
+    it("attachSkillUpdateToTrace includes tags with learning and skillbook_update", () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn(),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      attachSkillUpdateToTrace("int-8b-5", defaultUpdateBatch, 0, 1);
+
+      const traceCall = mocks.opikClient.trace.mock.calls[0][0];
+      expect(traceCall.tags).toEqual(["learning", "skillbook_update"]);
+      expect(traceCall.metadata).toEqual({ interactionId: "int-8b-5" });
+    });
+
+    it("attachSatisfactionFeedbackToTrace includes tags", async () => {
+      const mockTrace = { end: vi.fn() };
+      mocks.opikClient = {
+        searchTraces: vi.fn().mockResolvedValue([{ id: "trace-8b-6" }]),
+        trace: vi.fn().mockReturnValue(mockTrace),
+        flush: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await _satTrace("int-8b-6", {
+        satisfactionFeedback: "worth_it",
+        originalOutcome: "accepted",
+        mappedSignal: "correct",
+        reflectionAnalysis: "test",
+        newLearnings: [],
+      });
+
+      const traceCall = mocks.opikClient.trace.mock.calls[0][0];
+      expect(traceCall.tags).toEqual(["learning", "satisfaction_feedback"]);
+      expect(traceCall.metadata).toEqual({ interactionId: "int-8b-6" });
     });
   });
 });

@@ -13,7 +13,10 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import z from "zod";
 import { TOOL_NAMES } from "@/lib/guardian/tool-names";
-import { loadUserSkillbook } from "@/lib/server/ace";
+import {
+  loadUserSkillbookInstance,
+  wrapSkillbookContext,
+} from "@/lib/server/ace";
 import { createBannedTermFilter } from "@/lib/server/guardian/filters";
 import { ANALYST_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/analyst";
 import { NEGOTIATOR_SYSTEM_PROMPT } from "@/lib/server/guardian/prompts/negotiator";
@@ -27,7 +30,15 @@ import { searchCouponsTool } from "@/lib/server/guardian/tools/coupon-search";
 import { presentReflectionTool } from "@/lib/server/guardian/tools/reflection-prompt";
 import { showWaitOptionTool } from "@/lib/server/guardian/tools/wait-option";
 import { presentWizardOptionTool } from "@/lib/server/guardian/tools/wizard-option";
-import { getGuardianTelemetry, logDegradationTrace } from "@/lib/server/opik";
+
+import {
+  buildReasoningSummary,
+  getGuardianTelemetry,
+  logDegradationTrace,
+  writeTraceMetadata,
+} from "@/lib/server/opik";
+import { predictNextStrategy } from "@/lib/server/strategy-prediction";
+
 import { withTimeout } from "@/lib/server/utils";
 
 const TIER_PROMPTS: Record<InteractionTier, string> = {
@@ -35,6 +46,15 @@ const TIER_PROMPTS: Record<InteractionTier, string> = {
   negotiator: NEGOTIATOR_SYSTEM_PROMPT,
   therapist: THERAPIST_SYSTEM_PROMPT,
 };
+
+const MAX_CONTEXT_CHARS = 8000;
+
+function truncateContext(context: string): string {
+  if (context.length <= MAX_CONTEXT_CHARS) {
+    return context;
+  }
+  return `${context.substring(0, MAX_CONTEXT_CHARS)}\n\n[Skillbook truncated - showing top strategies]`;
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -147,10 +167,13 @@ export async function POST(req: Request) {
     return new Response("Failed to create interaction record", { status: 500 });
   }
 
-  // --- Load Skillbook context (Story 3.4) ---
+  // --- Load Skillbook context + instance (Story 3.4, Story 8.4) ---
   let skillbookContext = "";
+  let skillbookInstance: import("@pause/ace").Skillbook | null = null;
   try {
-    skillbookContext = await loadUserSkillbook(session.user.id);
+    const loaded = await loadUserSkillbookInstance(session.user.id);
+    skillbookInstance = loaded.skillbook;
+    skillbookContext = truncateContext(wrapSkillbookContext(skillbookInstance));
   } catch (error) {
     console.warn(
       "[Guardian] Skillbook loading failed, continuing without context:",
@@ -177,6 +200,12 @@ export async function POST(req: Request) {
       content: `[Purchase context: ${purchaseContext}]`,
     });
   }
+
+  // --- Strategy prediction (Story 8.4) ---
+  const prediction = predictNextStrategy({
+    tier,
+    skillbook: skillbookInstance,
+  });
 
   // --- Banned terminology guardrail (Story 5.4, AC#3, #4, #7) ---
   const bannedTermReplacements: Array<{
@@ -225,7 +254,11 @@ export async function POST(req: Request) {
           reasoning: riskResult.reasoning,
         },
         tier,
-        isAutoApproved
+        isAutoApproved,
+        undefined,
+        undefined,
+        purchaseContext,
+        prediction
       ),
       abortSignal: AbortSignal.timeout(10_000),
     });
@@ -251,16 +284,24 @@ export async function POST(req: Request) {
           );
         }
 
-        // Extract reasoning summary for observability (NFR-O2)
-        let reasoningSummary: string;
-        if (isAutoApproved) {
-          reasoningSummary = `Low-risk unlock request (score: ${riskResult.score}). Auto-approved without intervention.`;
-        } else if (completedText.length <= 500) {
-          reasoningSummary = completedText;
-        } else {
-          const spaceIdx = completedText.lastIndexOf(" ", 500);
-          reasoningSummary = `${completedText.slice(0, spaceIdx === -1 ? 500 : spaceIdx)}...`;
-        }
+        // Build tier-aware reasoning summary for DB and Opik (NFR-O2, FR32)
+        const reasoningSummary = buildReasoningSummary({
+          tier,
+          riskScore: riskResult.score,
+          purchaseContext,
+          outcome: isAutoApproved ? "auto_approved" : undefined,
+          completedText: isAutoApproved ? undefined : completedText,
+          isAutoApproved,
+        });
+
+        // Write reasoning summary + structured metadata to Opik trace (Story 8.2, AC#8)
+        writeTraceMetadata(interactionId, {
+          reasoning_summary: reasoningSummary,
+          tier,
+          risk_score: riskResult.score,
+          purchase_context: purchaseContext,
+          outcome: isAutoApproved ? "auto_approved" : "pending",
+        });
 
         await db
           .update(interaction)
@@ -312,13 +353,14 @@ export async function POST(req: Request) {
       `[Guardian] Degradation activated for ${interactionId}: tier=${tier}, reason=${failureReason}`
     );
 
-    // --- Degradation telemetry (Story 3.6, AC#2, AC#4) ---
+    // --- Degradation telemetry (Story 3.6, AC#2, AC#4; Story 8.4) ---
     logDegradationTrace(
       interactionId,
       tier === "analyst" ? "analyst_only" : "break_glass",
       failureReason,
       { score: riskResult.score, reasoning: riskResult.reasoning },
-      tier
+      tier,
+      prediction
     );
 
     // --- Degradation Ladder (Story 3.6) ---
