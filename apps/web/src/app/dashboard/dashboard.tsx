@@ -10,8 +10,10 @@ import { SavingsCounter } from "@/components/dashboard/savings-counter";
 import { SavingsSummary } from "@/components/dashboard/savings-summary";
 import { GhostCardFeed } from "@/components/guardian/ghost-card-feed";
 import { GhostCardManagerProvider } from "@/components/guardian/ghost-card-manager";
+import { StatsPanel } from "@/components/guardian/stats-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFirstInteractionCelebration } from "@/hooks/use-first-interaction-celebration";
+import { getLayoutMode } from "@/lib/guardian/layout-mode";
 import { trpc } from "@/utils/trpc";
 
 function DashboardSkeleton() {
@@ -82,9 +84,12 @@ export default function Dashboard() {
   }
 
   const isNewUser = data.interactionCount === 0;
+  const guardianState = "idle" as const;
+  const layoutMode = getLayoutMode(guardianState);
+  const isFocused = layoutMode === "focused";
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" data-layout-mode={layoutMode}>
       {/* Card Vault area (~40vh) — read-only resting state */}
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
         <div className="text-muted-foreground text-sm">Card Vault</div>
@@ -109,13 +114,14 @@ export default function Dashboard() {
       <div
         className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4"
         data-celebrate={celebrating || undefined}
-        style={
-          celebrating
-            ? {
-                animation: "celebrate-pulse 0.3s ease-out",
-              }
-            : undefined
-        }
+        data-testid="dashboard-feed"
+        style={{
+          maxWidth: isFocused ? "640px" : "960px",
+          margin: "0 auto",
+          width: "100%",
+          transition: "max-width var(--pause-transition-normal) ease-in-out",
+          animation: celebrating ? "celebrate-pulse 0.3s ease-out" : undefined,
+        }}
       >
         <SavingsSummary
           acceptanceRate={data.acceptanceRate}
@@ -134,6 +140,15 @@ export default function Dashboard() {
             />
           </>
         )}
+
+        <StatsPanel
+          goodFrictionScore={Math.round(data.acceptanceRate)}
+          hidden={isFocused}
+          pauses={data.interactionCount}
+          sparklineData={[]}
+          streak={0}
+          totalSavedCents={data.totalSavedCents}
+        />
 
         <RecentInteractions interactions={data.recentInteractions} />
 

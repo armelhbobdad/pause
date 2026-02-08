@@ -264,6 +264,22 @@
   }
 }
 
+/* Visual Silence — CSS-only narrowing during Therapist reflection (Story 10.5, AC#10)
+   No DOM changes — sibling elements hidden via CSS adjacent sibling combinator */
+.visual-silence {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.visual-silence ~ * {
+  display: none;
+}
+
+/* Tabular nums utility — monospaced digits for counters (Story 10.5, AC#15) */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 @media (forced-colors: active) {
   .card,
   .glass-panel,

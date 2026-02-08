@@ -69,7 +69,7 @@ export function SavingsCounter({ totalCents }: SavingsCounterProps) {
       data-testid="savings-counter"
     >
       <span
-        className="font-bold text-2xl"
+        className="font-bold text-2xl tabular-nums"
         data-testid="savings-counter-value"
         style={{
           fontFamily: "var(--font-data)",
