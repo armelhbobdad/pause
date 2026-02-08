@@ -2,6 +2,7 @@ import { google } from "@ai-sdk/google";
 import { auth } from "@pause/auth";
 import { db } from "@pause/db";
 import { card, interaction } from "@pause/db/schema";
+import { env } from "@pause/env/server";
 import {
   convertToModelMessages,
   stepCountIs,
@@ -60,6 +61,38 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const DB_TIMEOUT_MS = 10_000;
+
+function getDemoStreamOptions(): { temperature?: number; seed?: number } {
+  if (env.DEMO_MODE === "true") {
+    return { temperature: 0, seed: 42 };
+  }
+  return {};
+}
+
+function buildPrepareStep(
+  tier: InteractionTier,
+  riskScore: number
+): () => Record<string, unknown> {
+  return () => {
+    if (tier === "negotiator") {
+      return {
+        toolCallStreaming: true,
+        activeTools: [TOOL_NAMES.SEARCH_COUPONS],
+      };
+    }
+    if (tier === "therapist") {
+      const activeTools: import("@/lib/guardian/tool-names").ToolName[] = [
+        TOOL_NAMES.PRESENT_REFLECTION,
+        TOOL_NAMES.SHOW_WAIT_OPTION,
+      ];
+      if (riskScore >= 85) {
+        activeTools.push(TOOL_NAMES.PRESENT_WIZARD_OPTION);
+      }
+      return { toolCallStreaming: true, activeTools };
+    }
+    return {};
+  };
+}
 
 const requestSchema = z.object({
   messages: z
@@ -218,31 +251,14 @@ export async function POST(req: Request) {
       model: google("gemini-2.5-flash"),
       system: systemPrompt,
       messages: modelMessages,
+      ...getDemoStreamOptions(),
       tools: {
         [TOOL_NAMES.SEARCH_COUPONS]: searchCouponsTool,
         [TOOL_NAMES.PRESENT_REFLECTION]: presentReflectionTool,
         [TOOL_NAMES.SHOW_WAIT_OPTION]: showWaitOptionTool,
         [TOOL_NAMES.PRESENT_WIZARD_OPTION]: presentWizardOptionTool,
       },
-      prepareStep: () => {
-        if (tier === "negotiator") {
-          return {
-            toolCallStreaming: true,
-            activeTools: [TOOL_NAMES.SEARCH_COUPONS],
-          };
-        }
-        if (tier === "therapist") {
-          const activeTools: import("@/lib/guardian/tool-names").ToolName[] = [
-            TOOL_NAMES.PRESENT_REFLECTION,
-            TOOL_NAMES.SHOW_WAIT_OPTION,
-          ];
-          if (riskResult.score >= 85) {
-            activeTools.push(TOOL_NAMES.PRESENT_WIZARD_OPTION);
-          }
-          return { toolCallStreaming: true, activeTools };
-        }
-        return {};
-      },
+      prepareStep: buildPrepareStep(tier, riskResult.score),
       stopWhen: stepCountIs(isAutoApproved ? 1 : 5),
       experimental_transform: createBannedTermFilter((replacements) => {
         bannedTermReplacements.push(...replacements);

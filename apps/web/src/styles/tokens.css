@@ -79,6 +79,13 @@
   --guardian-error-bg: oklch(0.95 0.03 22);
   --duration-pulse-fade: 300ms;
 
+  /* Auto-Relock Timer (Story 9.4)
+     ADR: oklch colors for perceptual uniformity; green→yellow→red depletion */
+  --relock-green: oklch(0.72 0.18 145);
+  --relock-yellow: oklch(0.78 0.16 85);
+  --relock-red: oklch(0.65 0.22 25);
+  --relock-bar-height: 3px;
+
   /* Typography
      ADR: Geist Sans is Next.js default; JetBrains Mono for data/codes
      Note: Uses CSS variables from next/font/google loaded in layout.tsx */

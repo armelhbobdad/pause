@@ -13,3 +13,5 @@ extend-exclude = [
 
 [default.extend-words]
 # Add false-positive corrections here as needed
+strat = "strat"
+sav = "sav"

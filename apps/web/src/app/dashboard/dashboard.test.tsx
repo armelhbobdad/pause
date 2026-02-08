@@ -43,6 +43,14 @@ const mocks = vi.hoisted(() => ({
     error: null as Error | null,
     refetch: vi.fn(),
   },
+  referralResult: {
+    data: undefined as
+      | { shouldShow: boolean; consecutiveOverrides: number }
+      | undefined,
+    isLoading: false,
+    error: null as Error | null,
+    refetch: vi.fn(),
+  },
 }));
 
 // --- Mock @tanstack/react-query useQuery ---
@@ -52,8 +60,14 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
     ...actual,
     useQuery: vi.fn(() => {
       const idx = mocks.useQueryCallIndex++;
-      // First useQuery call is dashboard.summary, second is savings.getSummary
-      return idx === 0 ? mocks.dashboardResult : mocks.savingsResult;
+      // First: dashboard.summary, second: savings.getSummary, third: dashboard.referralStatus
+      if (idx === 0) {
+        return mocks.dashboardResult;
+      }
+      if (idx === 1) {
+        return mocks.savingsResult;
+      }
+      return mocks.referralResult;
     }),
   };
 });
@@ -65,6 +79,12 @@ vi.mock("@/utils/trpc", () => ({
       summary: {
         queryOptions: vi.fn(() => ({
           queryKey: ["dashboard", "summary"],
+          queryFn: vi.fn(),
+        })),
+      },
+      referralStatus: {
+        queryOptions: vi.fn(() => ({
+          queryKey: ["dashboard", "referralStatus"],
           queryFn: vi.fn(),
         })),
       },
@@ -110,6 +130,12 @@ describe("Dashboard", () => {
       refetch: vi.fn(),
     };
     mocks.savingsResult = {
+      data: undefined,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    mocks.referralResult = {
       data: undefined,
       isLoading: false,
       error: null,

@@ -25,6 +25,12 @@ const TIER_COLORS: Record<string, string> = {
   therapist: "var(--therapist-amber)",
 };
 
+/** Neutral outcomes that get muted styling and a human-friendly label */
+const NEUTRAL_OUTCOMES: Record<string, string> = {
+  abandoned: "Left without deciding",
+  timeout: "Session timed out",
+};
+
 export function RecentInteractions({ interactions }: RecentInteractionsProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -45,6 +51,9 @@ export function RecentInteractions({ interactions }: RecentInteractionsProps) {
         const isExpanded = expandedId === interaction.id;
         const tierColor =
           TIER_COLORS[interaction.tier] ?? "var(--muted-foreground)";
+        const neutralLabel = interaction.outcome
+          ? NEUTRAL_OUTCOMES[interaction.outcome]
+          : undefined;
 
         return (
           <li key={interaction.id}>
@@ -58,10 +67,21 @@ export function RecentInteractions({ interactions }: RecentInteractionsProps) {
                 aria-label={`${interaction.tier} tier`}
                 className="h-2 w-2 shrink-0 rounded-full"
                 role="img"
-                style={{ backgroundColor: tierColor }}
+                style={{
+                  backgroundColor: neutralLabel
+                    ? "var(--muted-foreground)"
+                    : tierColor,
+                  opacity: neutralLabel ? 0.5 : 1,
+                }}
               />
-              <span className="flex-1 truncate text-sm">
-                {interaction.outcome ?? "pending"}
+              <span
+                className="flex-1 truncate text-sm"
+                data-testid={
+                  neutralLabel ? `neutral-${interaction.id}` : undefined
+                }
+                style={neutralLabel ? { opacity: 0.6 } : undefined}
+              >
+                {neutralLabel ?? interaction.outcome ?? "pending"}
               </span>
               <span className="text-muted-foreground text-xs">
                 {interaction.cardLastFour

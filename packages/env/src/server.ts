@@ -36,6 +36,8 @@ export const env = createEnv({
     OPIK_WORKSPACE: z.string().min(1).optional(),
     // Google Generative AI: required for Gemini model
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1),
+    // Referral card: consecutive high-risk override threshold
+    REFERRAL_THRESHOLD: z.coerce.number().int().min(1).default(3),
     // Demo mode: controls trace tagging and feature flags
     DEMO_MODE: z.enum(["true", "false"]).default("false"),
   },

@@ -14,6 +14,7 @@ import {
 import { GuardianErrorBoundary } from "@/components/guardian/guardian-error-boundary";
 import { GuardianErrorFallback } from "@/components/guardian/guardian-error-fallback";
 import { MessageRenderer } from "@/components/guardian/message-renderer";
+import { RelockTimer } from "@/components/guardian/relock-timer";
 import { useGuardianState } from "@/hooks/use-guardian-state";
 import { useStreamTimeout } from "@/hooks/use-stream-timeout";
 
@@ -40,6 +41,10 @@ export interface CommandCenterProps {
   onCountdownExpire?: () => void;
   /** Callback when Guardian times out */
   onTimeout?: () => void;
+  /** Auto-relock timeout in ms (default: 300000 — 5 minutes for demo) */
+  relockTimeoutMs?: number;
+  /** Callback when auto-relock fires — used to POST feedback with "timeout" outcome */
+  onAutoRelock?: () => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -69,6 +74,8 @@ export function CommandCenter({
   countdownDuration = 60_000,
   onCountdownExpire,
   onTimeout,
+  relockTimeoutMs = 300_000,
+  onAutoRelock,
   className,
 }: CommandCenterProps) {
   return (
@@ -80,8 +87,10 @@ export function CommandCenter({
         countdownDuration={countdownDuration}
         feedContent={feedContent}
         guardianContent={guardianContent}
+        onAutoRelock={onAutoRelock}
         onCountdownExpire={onCountdownExpire}
         onTimeout={onTimeout}
+        relockTimeoutMs={relockTimeoutMs}
         showCountdown={showCountdown}
         tier={tier}
       />
@@ -99,9 +108,12 @@ function CommandCenterInner({
   countdownDuration = 60_000,
   onCountdownExpire,
   onTimeout,
+  relockTimeoutMs = 300_000,
+  onAutoRelock,
   className,
 }: CommandCenterProps) {
   const {
+    state,
     isActive,
     isRevealed,
     revealType,
@@ -234,6 +246,43 @@ function CommandCenterInner({
     }
   }, [isBreakGlass]);
 
+  // Abandoned tracking: send beacon on beforeunload when active (Story 9.5)
+  useEffect(() => {
+    if (state !== "active") {
+      return;
+    }
+    const handler = () => {
+      if (interactionIdRef.current) {
+        navigator.sendBeacon(
+          "/api/ai/feedback",
+          new Blob(
+            [
+              JSON.stringify({
+                interactionId: interactionIdRef.current,
+                outcome: "abandoned",
+              }),
+            ],
+            { type: "application/json" }
+          )
+        );
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [state]);
+
+  // Auto-relock handler: relock + toast + callback (Story 9.4)
+  const handleAutoRelock = useRef(() => {
+    relock();
+    toast.info("Card re-locked for your protection", { duration: 3000 });
+    onAutoRelock?.();
+  });
+  handleAutoRelock.current = () => {
+    relock();
+    toast.info("Card re-locked for your protection", { duration: 3000 });
+    onAutoRelock?.();
+  };
+
   // Show error fallback while in break glass AND not yet dismissed
   const showErrorFallback = isBreakGlass && !errorDismissed;
 
@@ -275,16 +324,25 @@ function CommandCenterInner({
           padding: "1rem",
         }}
       >
-        <CardVault
-          card={card}
-          countdownDuration={countdownDuration}
-          isActive={isActive}
-          isRevealed={isRevealed}
-          onCountdownExpire={onCountdownExpire}
-          onUnlockRequest={requestUnlock}
-          revealType={revealType}
-          showCountdown={showCountdown && isRevealed}
-        />
+        <div style={{ position: "relative" }}>
+          <CardVault
+            card={card}
+            countdownDuration={countdownDuration}
+            isActive={isActive}
+            isRevealed={isRevealed}
+            onCountdownExpire={onCountdownExpire}
+            onUnlockRequest={requestUnlock}
+            revealType={revealType}
+            showCountdown={showCountdown && isRevealed}
+          />
+
+          {/* Auto-relock timer — only in revealed state, not break glass (Story 9.4) */}
+          <RelockTimer
+            durationMs={relockTimeoutMs}
+            isActive={isRevealed && revealType !== "break_glass"}
+            onExpire={() => handleAutoRelock.current()}
+          />
+        </div>
 
         {/* Guardian Conversation - expands below card when active or showing error fallback */}
         <GuardianConversation

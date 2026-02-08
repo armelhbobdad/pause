@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { RecentInteractions } from "@/components/dashboard/recent-interactions";
+import { ReferralCard } from "@/components/dashboard/referral-card";
 import { SavingsBreakdown } from "@/components/dashboard/savings-breakdown";
 import { SavingsCounter } from "@/components/dashboard/savings-counter";
 import { SavingsSummary } from "@/components/dashboard/savings-summary";
@@ -35,6 +36,11 @@ export default function Dashboard() {
   const { data: savingsData, isLoading: savingsLoading } = useQuery({
     ...trpc.savings.getSummary.queryOptions(),
     staleTime: 30_000,
+  });
+
+  const { data: referralData } = useQuery({
+    ...trpc.dashboard.referralStatus.queryOptions(),
+    staleTime: 60_000,
   });
 
   const celebrating = useFirstInteractionCelebration(
@@ -130,6 +136,12 @@ export default function Dashboard() {
         )}
 
         <RecentInteractions interactions={data.recentInteractions} />
+
+        {referralData?.shouldShow && (
+          <ReferralCard
+            consecutiveOverrides={referralData.consecutiveOverrides}
+          />
+        )}
 
         <GhostCardManagerProvider>
           <GhostCardFeed />

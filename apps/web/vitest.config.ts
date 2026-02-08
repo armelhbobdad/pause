@@ -17,6 +17,7 @@ export default defineConfig({
       "@pause/env/web": resolve(__dirname, "../../packages/env/src/web.ts"),
       "@pause/env": resolve(__dirname, "../../packages/env/src/index.ts"),
       "@pause/ace": resolve(__dirname, "../../packages/ace/src/index.ts"),
+      "drizzle-orm": resolve(__dirname, "./node_modules/drizzle-orm"),
     },
   },
   test: {
@@ -26,7 +27,13 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     server: {
       deps: {
-        inline: ["@pause/db", "@pause/auth", "@pause/env", "@pause/ace"],
+        inline: [
+          "@pause/db",
+          "@pause/auth",
+          "@pause/env",
+          "@pause/ace",
+          "drizzle-orm",
+        ],
       },
     },
   },
