@@ -30,6 +30,7 @@ const clientOutcomes = [
   "override",
   "wait",
   "abandoned",
+  "timeout",
   "skipped_savings",
   "accepted_savings",
 ] as const;
@@ -40,6 +41,7 @@ const outcomeMap = {
   override: "overridden",
   wait: "wait",
   abandoned: "abandoned",
+  timeout: "timeout",
   skipped_savings: "overridden",
   accepted_savings: "accepted",
 } as const satisfies Record<(typeof clientOutcomes)[number], string>;

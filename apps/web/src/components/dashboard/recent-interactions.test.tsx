@@ -119,4 +119,62 @@ describe("RecentInteractions", () => {
 
     expect(screen.getByTestId("time-int-1")).toHaveTextContent("2 hours ago");
   });
+
+  // ==========================================================================
+  // Abandoned / Timeout Styling (Story 9.5)
+  // ==========================================================================
+
+  describe("abandoned and timeout styling (Story 9.5)", () => {
+    const abandonedInteraction = {
+      id: "int-abandoned",
+      tier: "negotiator",
+      outcome: "abandoned",
+      reasoningSummary: null,
+      createdAt: new Date("2026-02-08T01:00:00Z"),
+      cardLastFour: "1111",
+    };
+
+    const timeoutInteraction = {
+      id: "int-timeout",
+      tier: "analyst",
+      outcome: "timeout",
+      reasoningSummary: null,
+      createdAt: new Date("2026-02-08T00:30:00Z"),
+      cardLastFour: "2222",
+    };
+
+    it("abandoned interaction shows 'Left without deciding' label", () => {
+      render(<RecentInteractions interactions={[abandonedInteraction]} />);
+
+      expect(screen.getByText("Left without deciding")).toBeInTheDocument();
+      expect(screen.queryByText("abandoned")).not.toBeInTheDocument();
+    });
+
+    it("timeout interaction shows 'Session timed out' label", () => {
+      render(<RecentInteractions interactions={[timeoutInteraction]} />);
+
+      expect(screen.getByText("Session timed out")).toBeInTheDocument();
+      expect(screen.queryByText("timeout")).not.toBeInTheDocument();
+    });
+
+    it("abandoned interaction has muted styling", () => {
+      render(<RecentInteractions interactions={[abandonedInteraction]} />);
+
+      const label = screen.getByTestId("neutral-int-abandoned");
+      expect(label.style.opacity).toBe("0.6");
+    });
+
+    it("timeout interaction has muted styling", () => {
+      render(<RecentInteractions interactions={[timeoutInteraction]} />);
+
+      const label = screen.getByTestId("neutral-int-timeout");
+      expect(label.style.opacity).toBe("0.6");
+    });
+
+    it("normal outcomes do not have muted styling", () => {
+      render(<RecentInteractions interactions={[mockInteractions[0]]} />);
+
+      expect(screen.queryByTestId("neutral-int-1")).not.toBeInTheDocument();
+    });
+  });
 });
