@@ -6,6 +6,10 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import z from "zod";
 import { runSatisfactionFeedbackLearning } from "@/lib/server/learning";
+import {
+  attachFeedbackScoreToTrace,
+  REGRET_FREE_SCORES,
+} from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
 export const runtime = "nodejs";
@@ -41,13 +45,16 @@ export async function PATCH(
 
   // --- Lookup ghost card ---
   const { id } = await params;
-  let existing: { id: string; userId: string } | undefined;
+  let existing:
+    | { id: string; userId: string; interactionId: string }
+    | undefined;
   try {
     const result = await withTimeout(
       db
         .select({
           id: ghostCard.id,
           userId: ghostCard.userId,
+          interactionId: ghostCard.interactionId,
         })
         .from(ghostCard)
         .where(eq(ghostCard.id, id))
@@ -85,6 +92,26 @@ export async function PATCH(
     return Response.json(
       { error: "Failed to update ghost card" },
       { status: 500 }
+    );
+  }
+
+  // --- Attach Opik regret-free score (Story 8.3) — fire-and-forget ---
+  const regretScore = REGRET_FREE_SCORES[parsed.data.satisfactionFeedback];
+  if (regretScore) {
+    attachFeedbackScoreToTrace(
+      existing.interactionId,
+      "regret_free_spending",
+      regretScore.value,
+      regretScore.reason
+    ).catch((error) => {
+      console.warn(
+        `[Opik] Regret-free score attachment failed for ${id}:`,
+        error
+      );
+    });
+  } else if (parsed.data.satisfactionFeedback === "not_sure") {
+    console.info(
+      "[Opik] Skipping regret_free_spending score for not_sure feedback"
     );
   }
 

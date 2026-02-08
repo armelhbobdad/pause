@@ -4,6 +4,10 @@ import { interaction } from "@pause/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { headers } from "next/headers";
 import z from "zod";
+import {
+  attachFeedbackScoreToTrace,
+  INTERVENTION_ACCEPTANCE_SCORES,
+} from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
 export const runtime = "nodejs";
@@ -115,6 +119,22 @@ export async function POST(req: Request) {
       { error: "Failed to update interaction" },
       { status: 500 }
     );
+  }
+
+  // --- Attach Opik feedback score (Story 8.3) — fire-and-forget ---
+  const scoreEntry = INTERVENTION_ACCEPTANCE_SCORES[rawOutcome];
+  if (scoreEntry) {
+    attachFeedbackScoreToTrace(
+      interactionId,
+      "intervention_acceptance",
+      scoreEntry.value,
+      scoreEntry.reason
+    ).catch((error) => {
+      console.warn(
+        `[Opik] Score attachment failed for ${interactionId}:`,
+        error
+      );
+    });
   }
 
   return Response.json({ success: true });

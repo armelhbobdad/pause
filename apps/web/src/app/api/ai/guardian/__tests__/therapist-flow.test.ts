@@ -195,9 +195,20 @@ vi.mock("@/lib/server/guardian/risk", () => ({
 }));
 
 // --- Mock ACE adapter ---
-vi.mock("@/lib/server/ace", () => ({
-  loadUserSkillbook: vi.fn().mockResolvedValue(""),
-}));
+vi.mock("@/lib/server/ace", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/server/ace")>();
+  return {
+    ...actual,
+    loadUserSkillbook: vi.fn().mockResolvedValue(""),
+    loadUserSkillbookInstance: vi.fn().mockResolvedValue({
+      skillbook: actual.Skillbook
+        ? new actual.Skillbook()
+        : { skills: () => [] },
+      version: 0,
+    }),
+    wrapSkillbookContext: vi.fn(() => ""),
+  };
+});
 
 // --- Mock telemetry ---
 vi.mock("@/lib/server/opik", () => ({

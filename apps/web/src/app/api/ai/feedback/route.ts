@@ -15,6 +15,10 @@ import {
   runReflection,
   runSkillUpdate,
 } from "@/lib/server/learning";
+import {
+  attachFeedbackScoreToTrace,
+  INTERVENTION_ACCEPTANCE_SCORES,
+} from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
 export const runtime = "nodejs";
@@ -58,6 +62,7 @@ async function runLearningPipeline(params: {
   metadata: unknown;
   reasoningSummary: string | null;
   outcome: string;
+  tier?: string;
 }) {
   const meta = (params.metadata ?? {}) as Record<string, unknown>;
   const purchaseCtx =
@@ -82,7 +87,10 @@ async function runLearningPipeline(params: {
 
   // Opik trace attachment and status update run independently via Promise.allSettled
   const [opikResult, statusResult] = await Promise.allSettled([
-    attachReflectionToTrace(params.interactionId, result.reflectionOutput),
+    attachReflectionToTrace(params.interactionId, result.reflectionOutput, {
+      tier: params.tier,
+      outcome: params.outcome,
+    }),
     markLearningComplete(params.interactionId),
   ]);
 
@@ -202,8 +210,24 @@ export async function POST(req: Request) {
     );
   }
 
-  // --- Ghost card creation — fire-and-forget, non-blocking (Story 6.4) ---
+  // --- Attach Opik feedback score (Story 8.3) — fire-and-forget ---
   const interactionId = parsed.data.interactionId;
+  const scoreEntry = INTERVENTION_ACCEPTANCE_SCORES[parsed.data.outcome];
+  if (scoreEntry) {
+    attachFeedbackScoreToTrace(
+      interactionId,
+      "intervention_acceptance",
+      scoreEntry.value,
+      scoreEntry.reason
+    ).catch((error) => {
+      console.warn(
+        `[Opik] Score attachment failed for ${interactionId}:`,
+        error
+      );
+    });
+  }
+
+  // --- Ghost card creation — fire-and-forget, non-blocking (Story 6.4) ---
   if (
     GHOST_QUALIFYING_OUTCOMES.includes(
       mappedOutcome as (typeof GHOST_QUALIFYING_OUTCOMES)[number]
@@ -226,6 +250,7 @@ export async function POST(req: Request) {
         metadata: existingInteraction.metadata,
         reasoningSummary: existingInteraction.reasoningSummary,
         outcome: mappedOutcome,
+        tier: existingInteraction.tier,
       })
     );
   }

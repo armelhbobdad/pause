@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => {
   const mockSelect = vi.fn();
   const mockUpdate = vi.fn();
 
+  const mockAttachFeedbackScoreToTrace = vi.fn();
+
   return {
     session: null as { user: { id: string } } | null,
     interactionResult: [] as Array<{
@@ -17,6 +19,7 @@ const mocks = vi.hoisted(() => {
     updateError: null as Error | null,
     mockSelect,
     mockUpdate,
+    mockAttachFeedbackScoreToTrace,
   };
 });
 
@@ -91,6 +94,19 @@ vi.mock("@/lib/server/utils", () => ({
   withTimeout: vi.fn(<T>(promise: Promise<T>, _ms: number) => promise),
 }));
 
+// --- Mock opik module (Story 8.3) ---
+vi.mock("@/lib/server/opik", () => ({
+  attachFeedbackScoreToTrace: mocks.mockAttachFeedbackScoreToTrace,
+  INTERVENTION_ACCEPTANCE_SCORES: {
+    wait: { value: 1.0, reason: "User chose to wait as suggested" },
+    override: { value: 0.0, reason: "User overrode Guardian intervention" },
+    wizard_bookmark: {
+      value: 1.0,
+      reason: "User engaged deeply with reflection wizard",
+    },
+  },
+}));
+
 // --- Import the route handler ---
 import { POST } from "./route";
 
@@ -136,6 +152,7 @@ describe("Wizard-Complete Route Handler", () => {
     ];
     mocks.selectError = null;
     mocks.updateError = null;
+    mocks.mockAttachFeedbackScoreToTrace.mockResolvedValue(undefined);
 
     // Re-setup mock chains after clearAllMocks
     const selectChain = {
@@ -340,5 +357,44 @@ describe("Wizard-Complete Route Handler", () => {
     mocks.updateError = new Error("DB update failed");
     const response = await POST(createRequest(validBody));
     expect(response.status).toBe(500);
+  });
+
+  // ========================================================================
+  // Story 8.3: Feedback Score Attachment
+  // ========================================================================
+
+  describe("Feedback Score Attachment (Story 8.3)", () => {
+    it("calls attachFeedbackScoreToTrace with 1.0 for wait outcome", async () => {
+      await POST(createRequest(validBody));
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).toHaveBeenCalledWith(
+        "int-123",
+        "intervention_acceptance",
+        1.0,
+        "User chose to wait as suggested"
+      );
+    });
+
+    it("calls attachFeedbackScoreToTrace with 0.0 for override outcome", async () => {
+      await POST(createRequest({ ...validBody, outcome: "override" }));
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).toHaveBeenCalledWith(
+        "int-123",
+        "intervention_acceptance",
+        0.0,
+        "User overrode Guardian intervention"
+      );
+    });
+
+    it("calls attachFeedbackScoreToTrace with 1.0 for wizard_bookmark outcome", async () => {
+      await POST(createRequest({ ...validBody, outcome: "wizard_bookmark" }));
+
+      expect(mocks.mockAttachFeedbackScoreToTrace).toHaveBeenCalledWith(
+        "int-123",
+        "intervention_acceptance",
+        1.0,
+        "User engaged deeply with reflection wizard"
+      );
+    });
   });
 });

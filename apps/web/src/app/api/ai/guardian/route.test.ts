@@ -182,9 +182,20 @@ vi.mock("@/lib/server/guardian/risk", () => ({
   ),
 }));
 
-vi.mock("@/lib/server/ace", () => ({
-  loadUserSkillbook: vi.fn(async () => ""),
-}));
+vi.mock("@/lib/server/ace", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/server/ace")>();
+  return {
+    ...actual,
+    loadUserSkillbook: vi.fn(async () => ""),
+    loadUserSkillbookInstance: vi.fn(async () => ({
+      skillbook: actual.Skillbook
+        ? new actual.Skillbook()
+        : { skills: () => [] },
+      version: 0,
+    })),
+    wrapSkillbookContext: vi.fn(() => ""),
+  };
+});
 
 vi.mock("@/lib/server/opik", () => ({
   getGuardianTelemetry: vi.fn((id: string) => ({
@@ -192,6 +203,11 @@ vi.mock("@/lib/server/opik", () => ({
     metadata: { interactionId: id },
   })),
   logDegradationTrace: vi.fn(),
+  buildReasoningSummary: vi.fn(
+    (input: { tier: string; riskScore: number }) =>
+      `${input.tier} summary (score: ${input.riskScore})`
+  ),
+  writeTraceMetadata: vi.fn(),
 }));
 
 vi.mock("@/lib/server/guardian/prompts/analyst", () => ({
@@ -233,7 +249,6 @@ function createRequest(body: Record<string, unknown>): Request {
 }
 
 const UUID_REGEX = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/;
-const ELLIPSIS_SUFFIX_REGEX = /\.\.\.$/;
 
 const validBody = {
   messages: [{ role: "user", content: "test", id: "msg-1" }],
@@ -629,7 +644,8 @@ describe("Guardian Route Handler", () => {
         "analyst_only",
         "Model initialization failed",
         expect.objectContaining({ score: 10, reasoning: "test" }),
-        "analyst"
+        "analyst",
+        expect.objectContaining({ strategy_id: "auto_approve" })
       );
     });
 
@@ -649,7 +665,8 @@ describe("Guardian Route Handler", () => {
         "break_glass",
         "Model initialization failed",
         expect.objectContaining({ score: 50, reasoning: "test-negotiator" }),
-        "negotiator"
+        "negotiator",
+        expect.objectContaining({ strategy_id: "coupon_search" })
       );
     });
   });
@@ -664,15 +681,15 @@ describe("Guardian Route Handler", () => {
       expect(response.status).toBe(200);
     });
 
-    it("calls loadUserSkillbook with session.user.id", async () => {
-      const { loadUserSkillbook } = await import("@/lib/server/ace");
+    it("calls loadUserSkillbookInstance with session.user.id", async () => {
+      const { loadUserSkillbookInstance } = await import("@/lib/server/ace");
       await POST(createRequest(validBody));
-      expect(loadUserSkillbook).toHaveBeenCalledWith("user-1");
+      expect(loadUserSkillbookInstance).toHaveBeenCalledWith("user-1");
     });
 
     it("injects skillbook context into system prompt when non-empty", async () => {
-      const { loadUserSkillbook } = await import("@/lib/server/ace");
-      vi.mocked(loadUserSkillbook).mockResolvedValueOnce(
+      const { wrapSkillbookContext } = await import("@/lib/server/ace");
+      vi.mocked(wrapSkillbookContext).mockReturnValueOnce(
         "[learned strategies]"
       );
 
@@ -697,9 +714,9 @@ describe("Guardian Route Handler", () => {
       );
     });
 
-    it("continues streaming when loadUserSkillbook throws (graceful degradation)", async () => {
-      const { loadUserSkillbook } = await import("@/lib/server/ace");
-      vi.mocked(loadUserSkillbook).mockRejectedValueOnce(
+    it("continues streaming when loadUserSkillbookInstance throws (graceful degradation)", async () => {
+      const { loadUserSkillbookInstance } = await import("@/lib/server/ace");
+      vi.mocked(loadUserSkillbookInstance).mockRejectedValueOnce(
         new Error("ACE service down")
       );
 
@@ -743,7 +760,11 @@ describe("Guardian Route Handler", () => {
         expect.any(String),
         expect.objectContaining({ score: 10, reasoning: "test" }),
         "analyst",
-        true
+        true,
+        undefined,
+        undefined,
+        undefined,
+        expect.objectContaining({ strategy_id: "auto_approve" })
       );
     });
   });
@@ -827,7 +848,11 @@ describe("Guardian Route Handler", () => {
         expect.any(String),
         expect.objectContaining({ score: 50, reasoning: "test-negotiator" }),
         "negotiator",
-        false
+        false,
+        undefined,
+        undefined,
+        undefined,
+        expect.objectContaining({ strategy_id: "coupon_search" })
       );
     });
   });
@@ -949,7 +974,7 @@ describe("Guardian Route Handler", () => {
       const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
       const setCall = updateReturn?.set.mock.calls[0]?.[0];
       expect(setCall.status).toBe("completed");
-      expect(setCall.reasoningSummary).toBe("mock response text");
+      expect(setCall.reasoningSummary).toBe("negotiator summary (score: 50)");
       expect(setCall.outcome).toBeUndefined();
     });
 
@@ -960,7 +985,11 @@ describe("Guardian Route Handler", () => {
         expect.any(String),
         expect.objectContaining({ score: 10, reasoning: "test" }),
         "analyst",
-        true
+        true,
+        undefined,
+        undefined,
+        undefined,
+        expect.objectContaining({ strategy_id: "auto_approve" })
       );
     });
 
@@ -978,7 +1007,11 @@ describe("Guardian Route Handler", () => {
         expect.any(String),
         expect.objectContaining({ score: 70, reasoning: "test-therapist" }),
         "therapist",
-        false
+        false,
+        undefined,
+        undefined,
+        undefined,
+        expect.objectContaining({ strategy_id: "default" })
       );
     });
   });
@@ -1035,7 +1068,7 @@ describe("Guardian Route Handler", () => {
       expect(updateReturn?.set).toHaveBeenCalledWith(
         expect.objectContaining({
           status: "completed",
-          reasoningSummary: "mock response text",
+          reasoningSummary: "negotiator summary (score: 50)",
         })
       );
     });
@@ -1054,14 +1087,13 @@ describe("Guardian Route Handler", () => {
         expect.objectContaining({
           status: "completed",
           outcome: "auto_approved",
-          reasoningSummary:
-            "Low-risk unlock request (score: 10). Auto-approved without intervention.",
+          reasoningSummary: "analyst summary (score: 10)",
         })
       );
     });
 
-    // Task 6.2 continued: truncation at word boundary for long text
-    it("after() truncates reasoningSummary at last space before 500 chars with ellipsis", async () => {
+    // Task 6.2 continued: reasoningSummary uses buildReasoningSummary (Story 8.2 — truncation is internal)
+    it("after() calls buildReasoningSummary for long text (truncation handled by helper)", async () => {
       const { assessRisk } = await import("@/lib/server/guardian/risk");
       vi.mocked(assessRisk).mockResolvedValueOnce({
         score: 50,
@@ -1084,12 +1116,12 @@ describe("Guardian Route Handler", () => {
       const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
       const setCall = updateReturn?.set.mock.calls[0]?.[0];
       expect(setCall.reasoningSummary).toBeDefined();
-      expect(setCall.reasoningSummary.length).toBeLessThanOrEqual(504); // 500 + "..."
-      expect(setCall.reasoningSummary).toMatch(ELLIPSIS_SUFFIX_REGEX);
+      // buildReasoningSummary mock returns "negotiator summary (score: 50)"
+      expect(setCall.reasoningSummary).toBe("negotiator summary (score: 50)");
     });
 
-    // Task 6.2 edge case: truncation with no spaces falls back to hard cut at 500
-    it("after() hard-cuts reasoningSummary at 500 chars when text has no spaces", async () => {
+    // Task 6.2 edge case: buildReasoningSummary handles truncation internally
+    it("after() delegates truncation to buildReasoningSummary for no-space text", async () => {
       const { assessRisk } = await import("@/lib/server/guardian/risk");
       vi.mocked(assessRisk).mockResolvedValueOnce({
         score: 50,
@@ -1098,7 +1130,7 @@ describe("Guardian Route Handler", () => {
         historyAvailable: true,
       });
 
-      // Text with no spaces at all — lastIndexOf(" ", 500) returns -1
+      // Text with no spaces at all
       const noSpaceText = "x".repeat(800);
       mocks.streamResult.text = Promise.resolve(noSpaceText);
 
@@ -1112,8 +1144,8 @@ describe("Guardian Route Handler", () => {
       const updateReturn = mocks.mockUpdate.mock.results[0]?.value;
       const setCall = updateReturn?.set.mock.calls[0]?.[0];
       expect(setCall.reasoningSummary).toBeDefined();
-      expect(setCall.reasoningSummary.length).toBe(503); // 500 + "..."
-      expect(setCall.reasoningSummary).toMatch(ELLIPSIS_SUFFIX_REGEX);
+      // buildReasoningSummary mock handles truncation, returns consistent output
+      expect(setCall.reasoningSummary).toBe("negotiator summary (score: 50)");
     });
 
     // Task 6.4 / Task 3.2: stream failure → covered by "after() skips status update
