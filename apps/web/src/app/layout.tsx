@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
 
 import "../index.css";
-import Header from "@/components/header";
+import { AppNavbar } from "@/components/navigation/app-navbar";
 import Providers from "@/components/providers";
 import { DemoBadge } from "@/components/ui/demo-badge";
 
@@ -41,7 +41,7 @@ export default function RootLayout({
         <Providers>
           <DemoBadge />
           <div className="grid h-svh grid-rows-[auto_1fr]">
-            <Header />
+            <AppNavbar />
             {children}
           </div>
         </Providers>
