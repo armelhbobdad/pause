@@ -26,7 +26,8 @@ export type TraceName =
   | "system:failure:analyst_only"
   | "system:failure:break_glass"
   | "learning:reflection"
-  | "learning:skillbook_update";
+  | "learning:skillbook_update"
+  | "chat:knowledge";
 
 export const TRACE_NAMES = {
   ANALYST_AUTO_APPROVED: "guardian:analyst:auto_approved",
@@ -44,4 +45,5 @@ export const TRACE_NAMES = {
   SYSTEM_FAILURE_BREAK_GLASS: "system:failure:break_glass",
   LEARNING_REFLECTION: "learning:reflection",
   LEARNING_SKILLBOOK_UPDATE: "learning:skillbook_update",
+  CHAT_KNOWLEDGE: "chat:knowledge",
 } as const satisfies Record<string, TraceName>;

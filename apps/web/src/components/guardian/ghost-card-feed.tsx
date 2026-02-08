@@ -93,7 +93,7 @@ function FeedSkeleton() {
           style={{
             height: "120px",
             borderRadius: "0.5rem",
-            backgroundColor: "var(--muted, #1a1a2e)",
+            backgroundColor: "var(--muted)",
             animation: "pulse 2s ease-in-out infinite",
           }}
         />

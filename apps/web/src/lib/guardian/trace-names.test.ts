@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { TraceName } from "./trace-names";
 import { TRACE_NAMES } from "./trace-names";
 
-const COLON_PREFIX_PATTERN = /^(guardian|system|learning):/;
+const COLON_PREFIX_PATTERN = /^(guardian|system|learning|chat):/;
 
 describe("trace-names", () => {
-  it("TRACE_NAMES has all 15 entries", () => {
-    expect(Object.keys(TRACE_NAMES)).toHaveLength(15);
+  it("TRACE_NAMES has all 16 entries", () => {
+    expect(Object.keys(TRACE_NAMES)).toHaveLength(16);
   });
 
   it("all TRACE_NAMES values are valid TraceName strings", () => {
@@ -26,6 +26,7 @@ describe("trace-names", () => {
       "system:failure:break_glass",
       "learning:reflection",
       "learning:skillbook_update",
+      "chat:knowledge",
     ];
     const values = Object.values(TRACE_NAMES);
     for (const expected of expectedValues) {

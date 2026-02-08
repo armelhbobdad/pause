@@ -6,6 +6,7 @@ import "../index.css";
 import { AppNavbar } from "@/components/navigation/app-navbar";
 import Providers from "@/components/providers";
 import { DemoBadge } from "@/components/ui/demo-badge";
+import { FloatingChatWidget } from "@/components/uitripled/floating-chat-widget-shadcnui";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,10 +41,11 @@ export default function RootLayout({
       >
         <Providers>
           <DemoBadge />
-          <div className="grid h-svh grid-rows-[auto_1fr]">
+          <div className="grid h-dvh grid-rows-[auto_1fr]">
             <AppNavbar />
             {children}
           </div>
+          <FloatingChatWidget />
         </Providers>
       </body>
     </html>

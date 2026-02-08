@@ -288,7 +288,7 @@ export function SavingsTicket({
       )}
 
       {!isApplied && isSkipped && (
-        <StatusIndicator color="var(--text-secondary, #888)" text="Skipped" />
+        <StatusIndicator color="var(--muted-foreground)" text="Skipped" />
       )}
     </output>
   );
