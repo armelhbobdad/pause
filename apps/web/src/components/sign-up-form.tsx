@@ -1,12 +1,14 @@
+"use client";
+
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useState } from "react";
 import z from "zod";
 
+import { NativeButton } from "@/components/uitripled/native-button-shadcnui";
 import { authClient } from "@/lib/auth-client";
 
 import Loader from "./loader";
-import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
@@ -17,6 +19,7 @@ export default function SignUpForm({
 }) {
   const router = useRouter();
   const { isPending } = authClient.useSession();
+  const [serverError, setServerError] = useState("");
 
   const form = useForm({
     defaultValues: {
@@ -25,6 +28,7 @@ export default function SignUpForm({
       name: "",
     },
     onSubmit: async ({ value }) => {
+      setServerError("");
       await authClient.signUp.email(
         {
           email: value.email,
@@ -34,10 +38,11 @@ export default function SignUpForm({
         {
           onSuccess: () => {
             router.push("/dashboard");
-            toast.success("Sign up successful");
           },
           onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
+            setServerError(
+              error.error.message || error.error.statusText || "Sign up failed"
+            );
           },
         }
       );
@@ -56,7 +61,16 @@ export default function SignUpForm({
   }
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-md p-6">
+    <div
+      className="glass-panel mx-auto mt-10 w-full max-w-[480px] rounded-2xl border p-6"
+      data-glass
+      style={{
+        background: "var(--pause-glass)",
+        backdropFilter: "blur(var(--pause-blur-medium))",
+        WebkitBackdropFilter: "blur(var(--pause-blur-medium))",
+        borderColor: "oklch(1 0 0 / 0.15)",
+      }}
+    >
       <h1 className="mb-6 text-center font-bold text-3xl">Create Account</h1>
 
       <form
@@ -80,7 +94,11 @@ export default function SignUpForm({
                   value={field.state.value}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p className="text-red-500" key={error?.message}>
+                  <p
+                    className="text-sm"
+                    key={error?.message}
+                    style={{ color: "hsl(var(--destructive))" }}
+                  >
                     {error?.message}
                   </p>
                 ))}
@@ -103,7 +121,11 @@ export default function SignUpForm({
                   value={field.state.value}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p className="text-red-500" key={error?.message}>
+                  <p
+                    className="text-sm"
+                    key={error?.message}
+                    style={{ color: "hsl(var(--destructive))" }}
+                  >
                     {error?.message}
                   </p>
                 ))}
@@ -126,7 +148,11 @@ export default function SignUpForm({
                   value={field.state.value}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p className="text-red-500" key={error?.message}>
+                  <p
+                    className="text-sm"
+                    key={error?.message}
+                    style={{ color: "hsl(var(--destructive))" }}
+                  >
                     {error?.message}
                   </p>
                 ))}
@@ -135,27 +161,34 @@ export default function SignUpForm({
           </form.Field>
         </div>
 
+        {serverError && (
+          <p className="text-sm" style={{ color: "hsl(var(--destructive))" }}>
+            {serverError}
+          </p>
+        )}
+
         <form.Subscribe>
           {(state) => (
-            <Button
+            <NativeButton
               className="w-full"
-              disabled={!state.canSubmit || state.isSubmitting}
+              disabled={!state.canSubmit}
+              loading={state.isSubmitting}
               type="submit"
             >
-              {state.isSubmitting ? "Submitting..." : "Sign Up"}
-            </Button>
+              Sign Up
+            </NativeButton>
           )}
         </form.Subscribe>
       </form>
 
       <div className="mt-4 text-center">
-        <Button
-          className="text-indigo-600 hover:text-indigo-800"
+        <button
+          className="text-muted-foreground text-sm underline-offset-4 transition-colors hover:text-foreground hover:underline"
           onClick={onSwitchToSignIn}
-          variant="link"
+          type="button"
         >
           Already have an account? Sign In
-        </Button>
+        </button>
       </div>
     </div>
   );

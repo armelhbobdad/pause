@@ -243,6 +243,27 @@
   pointer-events: none;
 }
 
+/* Landing Page Card Preview Breathing Animation (Story 10.4)
+   CSS-only approach mandated for parallel worktree safety with Story 10.2.
+   Uses --pause-timing-breathe (4s) for visual continuity with dashboard card. */
+@keyframes card-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-card-breathe {
+    animation: none !important;
+  }
+}
+
 @media (forced-colors: active) {
   .card,
   .glass-panel,
