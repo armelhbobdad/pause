@@ -132,4 +132,48 @@ describe("Design Tokens (Story 10.1)", () => {
       expect(darkSection).toMatch(RE_BACKGROUND_OKLCH);
     });
   });
+
+  describe("Dark-only theme enforcement (Story 10.1)", () => {
+    it("providers.tsx uses forcedTheme='dark'", () => {
+      const providersPath = resolve(__dirname, "../components/providers.tsx");
+      const providersSrc = readFileSync(providersPath, "utf-8");
+      expect(providersSrc).toContain('forcedTheme="dark"');
+    });
+
+    it("providers.tsx uses defaultTheme='dark'", () => {
+      const providersPath = resolve(__dirname, "../components/providers.tsx");
+      const providersSrc = readFileSync(providersPath, "utf-8");
+      expect(providersSrc).toContain('defaultTheme="dark"');
+    });
+
+    it("providers.tsx uses class attribute for theme", () => {
+      const providersPath = resolve(__dirname, "../components/providers.tsx");
+      const providersSrc = readFileSync(providersPath, "utf-8");
+      expect(providersSrc).toContain('attribute="class"');
+    });
+
+    it("layout.tsx uses h-dvh for dynamic viewport height", () => {
+      const layoutPath = resolve(__dirname, "../app/layout.tsx");
+      const layoutSrc = readFileSync(layoutPath, "utf-8");
+      expect(layoutSrc).toContain("h-dvh");
+      expect(layoutSrc).not.toContain("h-svh");
+    });
+
+    it("layout.tsx renders FloatingChatWidget globally", () => {
+      const layoutPath = resolve(__dirname, "../app/layout.tsx");
+      const layoutSrc = readFileSync(layoutPath, "utf-8");
+      expect(layoutSrc).toContain("FloatingChatWidget");
+      expect(layoutSrc).toContain("<FloatingChatWidget />");
+    });
+  });
+
+  describe("Visual silence tokens (Story 10.5)", () => {
+    it("defines visual-silence class", () => {
+      expect(tokensCss).toContain(".visual-silence");
+    });
+
+    it("has savings ticket animation", () => {
+      expect(tokensCss).toContain("savings-ticket-enter");
+    });
+  });
 });

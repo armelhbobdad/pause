@@ -191,4 +191,88 @@ describe("FloatingChatWidget", () => {
     const sendButton = screen.getByLabelText("Send message");
     expect(sendButton).toBeDisabled();
   });
+
+  it("does not send empty or whitespace-only messages", async () => {
+    const user = userEvent.setup();
+    render(<FloatingChatWidget />);
+    await user.click(screen.getByLabelText("Open chat"));
+    const input = screen.getByPlaceholderText("Ask Pause anything...");
+    await user.type(input, "   ");
+    await user.keyboard("{Enter}");
+    expect(mockSendMessage).not.toHaveBeenCalled();
+  });
+
+  it("bubble trigger has aria-expanded matching panel state", async () => {
+    const user = userEvent.setup();
+    render(<FloatingChatWidget />);
+    const bubble = screen.getByLabelText("Open chat");
+    expect(bubble).toHaveAttribute("aria-expanded", "false");
+    await user.click(bubble);
+    // After opening, both header close and bubble trigger have "Close chat"
+    // Find the bubble trigger (outside dialog) by filtering
+    const closeBubbles = screen
+      .getAllByLabelText("Close chat")
+      .filter((el) => !el.closest('[role="dialog"]'));
+    expect(closeBubbles).toHaveLength(1);
+    expect(closeBubbles[0]).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("panel has correct dialog role and label", async () => {
+    const user = userEvent.setup();
+    render(<FloatingChatWidget />);
+    await user.click(screen.getByLabelText("Open chat"));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-label", "Chat with Pause");
+  });
+
+  describe("Focus trap (AC#4)", () => {
+    it("focuses input when panel opens", async () => {
+      const user = userEvent.setup();
+      render(<FloatingChatWidget />);
+      await user.click(screen.getByLabelText("Open chat"));
+      // Wait for the focus timeout (100ms delay in component)
+      await vi.waitFor(() => {
+        expect(document.activeElement?.tagName).toBe("INPUT");
+      });
+    });
+
+    it("Tab from input moves to send button when enabled", async () => {
+      const user = userEvent.setup();
+      render(<FloatingChatWidget />);
+      await user.click(screen.getByLabelText("Open chat"));
+      const input = screen.getByPlaceholderText("Ask Pause anything...");
+      // Type text so the send button becomes enabled (disabled buttons can't receive focus)
+      await user.type(input, "test");
+      await user.keyboard("{Tab}");
+      // Focus should be on the send button
+      expect(document.activeElement?.getAttribute("aria-label")).toBe(
+        "Send message"
+      );
+    });
+
+    it("Tab from close button wraps back to input", async () => {
+      const user = userEvent.setup();
+      render(<FloatingChatWidget />);
+      await user.click(screen.getByLabelText("Open chat"));
+      const dialog = screen.getByRole("dialog");
+      const closeButton = dialog.querySelector(
+        'button[aria-label="Close chat"]'
+      ) as HTMLElement;
+      closeButton.focus();
+      await user.keyboard("{Tab}");
+      expect(document.activeElement?.tagName).toBe("INPUT");
+    });
+
+    it("Shift+Tab from input wraps to close button", async () => {
+      const user = userEvent.setup();
+      render(<FloatingChatWidget />);
+      await user.click(screen.getByLabelText("Open chat"));
+      const input = screen.getByPlaceholderText("Ask Pause anything...");
+      input.focus();
+      await user.keyboard("{Shift>}{Tab}{/Shift}");
+      expect(document.activeElement?.getAttribute("aria-label")).toBe(
+        "Close chat"
+      );
+    });
+  });
 });

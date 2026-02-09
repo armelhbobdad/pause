@@ -57,6 +57,9 @@ vi.mock("@/lib/auth-client", () => ({
   },
 }));
 
+import { BlurOverlay } from "@/components/guardian/blur-overlay";
+import { CardVaultInner } from "@/components/guardian/card-vault-inner";
+import { ProgressiveSkeleton } from "@/components/guardian/progressive-skeleton";
 import { AppNavbar } from "@/components/navigation/app-navbar";
 import { FloatingChatWidget } from "@/components/uitripled/floating-chat-widget-shadcnui";
 import { NativeButton } from "@/components/uitripled/native-button-shadcnui";
@@ -86,8 +89,38 @@ describe("Reduced motion compliance (Story 10.6, AC#10)", () => {
   it("NativeButton does not scale on hover/tap when reduced motion is preferred", () => {
     mockReducedMotion.mockReturnValue(true);
     render(<NativeButton>Click</NativeButton>);
-    // With reduced motion, whileHover and whileTap should be empty objects
-    // Since we mock motion.div as plain div, we just verify it renders without error
     expect(screen.getByText("Click")).toBeInTheDocument();
+  });
+
+  it("BlurOverlay renders in blurred state with reduced motion", () => {
+    mockReducedMotion.mockReturnValue(true);
+    const { container } = render(<BlurOverlay state="blurred" />);
+    expect(container.firstChild).toBeInTheDocument();
+  });
+
+  it("BlurOverlay renders in revealing state with reduced motion", () => {
+    mockReducedMotion.mockReturnValue(true);
+    const { container } = render(<BlurOverlay state="revealing" />);
+    expect(container.firstChild).toBeInTheDocument();
+  });
+
+  it("CardVaultInner renders in idle state with reduced motion", () => {
+    mockReducedMotion.mockReturnValue(true);
+    const { container } = render(<CardVaultInner guardianState="idle" />);
+    expect(container.firstChild).toBeInTheDocument();
+  });
+
+  it("CardVaultInner renders in active state with reduced motion", () => {
+    mockReducedMotion.mockReturnValue(true);
+    const { container } = render(<CardVaultInner guardianState="active" />);
+    expect(container.firstChild).toBeInTheDocument();
+  });
+
+  it("ProgressiveSkeleton renders active with reduced motion", () => {
+    mockReducedMotion.mockReturnValue(true);
+    render(<ProgressiveSkeleton isActive />);
+    expect(
+      screen.getByText("Analyzing your spending patterns...")
+    ).toBeInTheDocument();
   });
 });
