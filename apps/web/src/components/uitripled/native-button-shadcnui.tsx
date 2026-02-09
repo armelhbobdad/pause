@@ -63,7 +63,12 @@ const NativeButton = ({
 
   return (
     <motion.div
-      className="relative block w-fit"
+      className={cn(
+        "relative block",
+        typeof className === "string" && className.includes("w-full")
+          ? "w-full"
+          : "w-fit"
+      )}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
       whileHover={
         disabled || loading || shouldReduceMotion ? {} : { scale: 1.02 }
