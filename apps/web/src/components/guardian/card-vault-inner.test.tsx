@@ -100,11 +100,11 @@ describe("CardVaultInner", () => {
     expect(inner.getAttribute("data-transition-repeat")).toBe("Infinity");
   });
 
-  it("maps active state to amber glow using --pause-active token", () => {
+  it("maps active state to amber glow", () => {
     render(<CardVaultInner guardianState="active" />);
     const inner = screen.getByTestId("card-vault-inner");
     const animate = getAnimate(inner);
-    expect(JSON.stringify(animate.boxShadow)).toContain("var(--pause-active)");
+    expect(JSON.stringify(animate.boxShadow)).toContain("rgba(214, 180, 78");
   });
 
   // Collapsing state animation
@@ -126,7 +126,7 @@ describe("CardVaultInner", () => {
     render(<CardVaultInner guardianState="revealed" />);
     const inner = screen.getByTestId("card-vault-inner");
     const animate = getAnimate(inner);
-    expect(JSON.stringify(animate.boxShadow)).toContain("var(--pause-success)");
+    expect(JSON.stringify(animate.boxShadow)).toContain("rgba(48, 162, 76");
   });
 
   // Reduced motion
@@ -136,7 +136,7 @@ describe("CardVaultInner", () => {
     const inner = screen.getByTestId("card-vault-inner");
     const animate = getAnimate(inner);
     expect(animate.scale).toBe(1);
-    expect(animate.boxShadow).toContain("var(--guardian-pulse-start)");
+    expect(animate.boxShadow).toContain("rgba(200, 210, 230");
   });
 
   it("uses instant crossfade (150ms) with reduced motion", () => {

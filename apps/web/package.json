@@ -18,6 +18,8 @@
     "@ai-sdk/google": "^3.0.1",
     "@ai-sdk/react": "^3.0.3",
     "@base-ui/react": "^1.0.0",
+    "@onboardjs/core": "^1.0.0-rc.3",
+    "@onboardjs/react": "^1.0.0-rc.3",
     "@opentelemetry/auto-instrumentations-node": "^0.69.0",
     "@opentelemetry/sdk-node": "^0.211.0",
     "@pause/ace": "workspace:*",

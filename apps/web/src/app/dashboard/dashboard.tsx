@@ -242,7 +242,7 @@ export default function Dashboard() {
       />
 
       {!savingsLoading && savingsData && (
-        <>
+        <div id="tour-savings">
           <SavingsCounter totalCents={savingsData.totalCents} />
           <SavingsBreakdown
             avgCents={savingsData.avgCents}
@@ -250,7 +250,7 @@ export default function Dashboard() {
             sourceBreakdown={savingsData.sourceBreakdown}
             totalCents={savingsData.totalCents}
           />
-        </>
+        </div>
       )}
 
       <StatsPanel
@@ -262,7 +262,9 @@ export default function Dashboard() {
         totalSavedCents={data.totalSavedCents}
       />
 
-      <RecentInteractions interactions={data.recentInteractions} />
+      <div id="tour-history">
+        <RecentInteractions interactions={data.recentInteractions} />
+      </div>
 
       {referralData?.shouldShow && (
         <ReferralCard
@@ -270,9 +272,11 @@ export default function Dashboard() {
         />
       )}
 
-      <GhostCardManagerProvider>
-        <GhostCardFeed />
-      </GhostCardManagerProvider>
+      <div id="tour-ghost-cards">
+        <GhostCardManagerProvider>
+          <GhostCardFeed />
+        </GhostCardManagerProvider>
+      </div>
     </div>
   );
 

@@ -218,11 +218,11 @@ export function SavingsTicket({
       style={{
         display: "block",
         borderLeft: "4px solid var(--savings-gold)",
-        backgroundColor: "var(--savings-gold-subtle)",
+        backgroundColor: "oklch(0.18 0.04 85 / 65%)",
         borderRadius: "0.5rem",
-        padding: "0.75rem 1rem",
+        padding: "1rem 1.125rem",
         boxShadow:
-          "0 1px 3px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.06)",
+          "0 1px 3px oklch(0 0 0 / 0.2), inset 0 1px 0 oklch(1 0 0 / 0.04)",
         animation: "savings-ticket-enter 800ms var(--ease-out-expo) both",
       }}
     >

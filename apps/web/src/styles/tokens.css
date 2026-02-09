@@ -84,7 +84,7 @@
   --relock-green: oklch(0.72 0.18 145);
   --relock-yellow: oklch(0.78 0.16 85);
   --relock-red: oklch(0.65 0.22 25);
-  --relock-bar-height: 3px;
+  --relock-bar-height: 4px;
 
   /* Typography
      ADR: Geist Sans is Next.js default; JetBrains Mono for data/codes
@@ -168,6 +168,20 @@
   /* Text Hierarchy */
   --text-hero: oklch(0.97 0.005 250);
   --text-secondary: oklch(0.7 0.02 250);
+}
+
+/* Guardian Thinking Dots — Pulsing indicator while AI streams (Design Review) */
+@keyframes thinking-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Shimmer Loading Animation (Story 4.4, AC#5)

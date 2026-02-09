@@ -33,6 +33,16 @@ function getTimerColor(fraction: number): string {
   return "var(--relock-red)";
 }
 
+/**
+ * Formats remaining milliseconds as M:SS.
+ */
+function formatTimeRemaining(remainingMs: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 // ============================================================================
 // RelockTimer Component
 // ============================================================================
@@ -40,9 +50,10 @@ function getTimerColor(fraction: number): string {
 /**
  * RelockTimer - Auto-relock progress bar for revealed card state
  *
- * Thin progress bar that depletes over the timeout period using CSS scaleX
+ * Progress bar that depletes over the timeout period using CSS scaleX
  * transition (GPU-composited). Color shifts green -> yellow -> red as time
- * runs low. Fires onExpire when timer reaches zero.
+ * runs low. Shows remaining time as "Card relocks in M:SS" label.
+ * Fires onExpire when timer reaches zero.
  *
  * @constraint UX-76: Thin progress bar at card bottom
  * @constraint Story 9.4 AC#2: Color shifts green → yellow → red
@@ -57,6 +68,9 @@ export function RelockTimer({
 
   const [color, setColor] = useState("var(--relock-green)");
   const [started, setStarted] = useState(false);
+  const [timeLabel, setTimeLabel] = useState(() =>
+    formatTimeRemaining(durationMs)
+  );
   const startTimeRef = useRef(0);
 
   // Start the bar animation on next frame after mount (so scaleX(1) renders first)
@@ -67,15 +81,16 @@ export function RelockTimer({
     }
 
     startTimeRef.current = Date.now();
+    setTimeLabel(formatTimeRemaining(durationMs));
     // Start transition on next frame so the browser renders scaleX(1) first
     const frameId = requestAnimationFrame(() => {
       setStarted(true);
     });
 
     return () => cancelAnimationFrame(frameId);
-  }, [isActive]);
+  }, [isActive, durationMs]);
 
-  // Color update interval — checks every second
+  // Color + time label update interval — checks every second
   useEffect(() => {
     if (!isActive) {
       return;
@@ -84,7 +99,9 @@ export function RelockTimer({
     const intervalId = setInterval(() => {
       const elapsed = Date.now() - startTimeRef.current;
       const fraction = Math.max(0, 1 - elapsed / durationMs);
+      const remainingMs = Math.max(0, durationMs - elapsed);
       setColor(getTimerColor(fraction));
+      setTimeLabel(formatTimeRemaining(remainingMs));
     }, 1000);
 
     return () => clearInterval(intervalId);
@@ -109,30 +126,59 @@ export function RelockTimer({
 
   return (
     <div
-      aria-hidden="true"
+      aria-label={`Card will relock in ${timeLabel}`}
       data-testid="relock-timer"
+      role="timer"
       style={{
         position: "absolute",
         bottom: 0,
         left: 0,
         right: 0,
-        height: "var(--relock-bar-height)",
-        overflow: "hidden",
-        borderRadius: "0 0 1rem 1rem",
       }}
     >
+      {/* Time remaining label */}
       <div
-        data-testid="relock-timer-bar"
         style={{
-          height: "100%",
-          width: "100%",
-          background: color,
-          transform: started ? "scaleX(0)" : "scaleX(1)",
-          transformOrigin: "left",
-          transition: started ? `transform ${durationMs}ms linear` : "none",
-          willChange: "transform",
+          display: "flex",
+          justifyContent: "center",
+          padding: "0.375rem 0 0.25rem",
         }}
-      />
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-data)",
+            fontSize: "0.6875rem",
+            letterSpacing: "0.04em",
+            color,
+            opacity: 0.9,
+            transition: "color 0.4s ease",
+          }}
+        >
+          Card relocks in <span style={{ fontWeight: 600 }}>{timeLabel}</span>
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div
+        style={{
+          height: "var(--relock-bar-height)",
+          overflow: "hidden",
+          borderRadius: "0 0 1rem 1rem",
+        }}
+      >
+        <div
+          data-testid="relock-timer-bar"
+          style={{
+            height: "100%",
+            width: "100%",
+            background: color,
+            transform: started ? "scaleX(0)" : "scaleX(1)",
+            transformOrigin: "left",
+            transition: started ? `transform ${durationMs}ms linear` : "none",
+            willChange: "transform",
+          }}
+        />
+      </div>
     </div>
   );
 }

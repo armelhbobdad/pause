@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
 
 import "../index.css";
+import { DemoPanel } from "@/components/demo/demo-panel";
 import { AppNavbar } from "@/components/navigation/app-navbar";
 import Providers from "@/components/providers";
-import { DemoBadge } from "@/components/ui/demo-badge";
 import { FloatingChatWidget } from "@/components/uitripled/floating-chat-widget-shadcnui";
 
 const geistSans = Geist({
@@ -55,7 +55,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
-          <DemoBadge />
+          <DemoPanel />
           <div className="grid h-dvh grid-rows-[auto_1fr]">
             <AppNavbar />
             {children}

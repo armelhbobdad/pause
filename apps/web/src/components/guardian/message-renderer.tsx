@@ -32,18 +32,36 @@ export function MessageRenderer({
   }
 
   return (
-    <div>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+      }}
+    >
       {assistantMessages.map((message) => (
-        <div key={message.id}>
+        <div
+          key={message.id}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.625rem",
+          }}
+        >
           {message.parts.map((part, partIndex) => {
             if (part.type === "text") {
               return (
-                <Streamdown
-                  isAnimating={isStreaming}
+                <div
                   key={`${message.id}-text-${partIndex}`}
+                  style={{
+                    fontFamily: "var(--font-conversation)",
+                    fontSize: "0.9375rem",
+                    lineHeight: 1.65,
+                    color: "oklch(0.88 0.01 250)",
+                  }}
                 >
-                  {part.text}
-                </Streamdown>
+                  <Streamdown isAnimating={isStreaming}>{part.text}</Streamdown>
+                </div>
               );
             }
 

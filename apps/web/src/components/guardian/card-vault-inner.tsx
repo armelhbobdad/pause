@@ -35,6 +35,20 @@ interface CardVaultInnerProps {
 }
 
 // ============================================================================
+// Animation Colors (rgba for Framer Motion interpolation — oklch is not animatable)
+// Perceptual equivalents of tokens.css oklch values:
+//   --guardian-pulse-start: oklch(0.85 0.02 250) → rgba(200, 210, 230, 0.6)
+//   --guardian-pulse-end:   oklch(0.92 0.01 250) → rgba(218, 224, 238, 0.35)
+//   --pause-active:         oklch(0.8 0.15 80)   → rgba(214, 180, 78, 0.7)
+//   --pause-success:        oklch(0.6 0.2 145)   → rgba(48, 162, 76, 0.7)
+// ============================================================================
+
+const GLOW_IDLE_A = "rgba(200, 210, 230, 0.6)";
+const GLOW_IDLE_B = "rgba(218, 224, 238, 0.35)";
+const GLOW_ACTIVE = "rgba(214, 180, 78, 0.7)";
+const GLOW_SUCCESS = "rgba(48, 162, 76, 0.7)";
+
+// ============================================================================
 // Animation Variants
 // ============================================================================
 
@@ -46,9 +60,9 @@ function getAnimationProps(
     // Reduced motion: static subtle glow for idle, instant crossfade for others
     let boxShadow = "none";
     if (guardianState === "idle") {
-      boxShadow = "0 0 15px 2px var(--guardian-pulse-start)";
+      boxShadow = `0 0 15px 2px ${GLOW_IDLE_A}`;
     } else if (guardianState === "active") {
-      boxShadow = "0 0 15px 2px var(--pause-active)";
+      boxShadow = `0 0 15px 2px ${GLOW_ACTIVE}`;
     }
     return {
       animate: {
@@ -69,9 +83,9 @@ function getAnimationProps(
         animate: {
           scale: [1, 1.02, 1],
           boxShadow: [
-            "0 0 10px 1px var(--guardian-pulse-start)",
-            "0 0 20px 4px var(--guardian-pulse-end)",
-            "0 0 10px 1px var(--guardian-pulse-start)",
+            `0 0 10px 1px ${GLOW_IDLE_A}`,
+            `0 0 20px 4px ${GLOW_IDLE_B}`,
+            `0 0 10px 1px ${GLOW_IDLE_A}`,
           ],
         },
         transition: {
@@ -84,8 +98,8 @@ function getAnimationProps(
       return {
         animate: {
           boxShadow: [
-            "0 0 0px 0px var(--guardian-pulse-start)",
-            "0 0 30px 8px var(--guardian-pulse-end)",
+            `0 0 0px 0px ${GLOW_IDLE_A}`,
+            `0 0 30px 8px ${GLOW_IDLE_B}`,
           ],
           scale: 1,
         },
@@ -98,9 +112,9 @@ function getAnimationProps(
       return {
         animate: {
           boxShadow: [
-            "0 0 12px 2px var(--pause-active)",
-            "0 0 24px 6px var(--pause-active)",
-            "0 0 12px 2px var(--pause-active)",
+            `0 0 12px 2px ${GLOW_ACTIVE}`,
+            `0 0 24px 6px ${GLOW_ACTIVE}`,
+            `0 0 12px 2px ${GLOW_ACTIVE}`,
           ],
           scale: 1,
         },
@@ -125,7 +139,7 @@ function getAnimationProps(
       return {
         animate: {
           scale: 1,
-          boxShadow: "0 0 20px 4px var(--pause-success)",
+          boxShadow: `0 0 20px 4px ${GLOW_SUCCESS}`,
         },
         transition: {
           duration: 0.3,

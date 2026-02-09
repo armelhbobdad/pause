@@ -2,21 +2,30 @@
 
 > Step-by-step instructions for replicating every feature in Pause.
 
+> **IMPORTANT — Gemini Rate Limits:**
+> Pause uses **Gemini 2.5 Flash** for all AI features (Guardian, Knowledge Chat, ACE Learning). On the free tier, Google enforces a hard limit of **20 requests per minute** per model. Each Guardian interaction triggers multiple API calls (risk assessment + streaming response + Skillbook learning), so you can realistically trigger only **~5 full Guardian flows per minute** before hitting the quota.
+>
+> **If the Guardian shows "Guardian unavailable" with a Manual Unlock fallback**, wait ~45 seconds and try again — the quota resets on a rolling window. The deployed app on Vercel shares the same API key across all users, so concurrent judges will deplete the quota faster.
+>
+> **Tip:** Space your Guardian interactions ~15-20 seconds apart for the most reliable experience. The Floating AI Chat and Dashboard features (profile switching, guided tour, history, ghost cards) do **not** count against this limit and work without any rate restrictions.
+
 ## Table of Contents
 
 - [1. Enable Demo Mode](#1-enable-demo-mode)
 - [2. Seed the Database](#2-seed-the-database)
 - [3. Start the App](#3-start-the-app)
 - [4. Create an Account & Sign In](#4-create-an-account--sign-in)
-- [5. Floating AI Chat (Try This First!)](#5-floating-ai-chat-try-this-first)
-- [6. The Three AI Tiers](#6-the-three-ai-tiers)
-- [7. Walkthrough: Analyst (Auto-Approve)](#7-walkthrough-analyst-auto-approve)
-- [8. Walkthrough: Negotiator (Coupon Search)](#8-walkthrough-negotiator-coupon-search)
-- [9. Walkthrough: Therapist (Reflection)](#9-walkthrough-therapist-reflection)
-- [10. Dashboard & History](#10-dashboard--history)
-- [11. Ghost Cards](#11-ghost-cards)
-- [12. Opik Observability Traces](#12-opik-observability-traces)
-- [13. What Demo Mode Changes](#13-what-demo-mode-changes)
+- [5. Floating Demo Panel](#5-floating-demo-panel)
+- [6. Guided Tour](#6-guided-tour)
+- [7. Floating AI Chat (Try This First!)](#7-floating-ai-chat-try-this-first)
+- [8. The Three AI Tiers](#8-the-three-ai-tiers)
+- [9. Walkthrough: Analyst (Auto-Approve)](#9-walkthrough-analyst-auto-approve)
+- [10. Walkthrough: Negotiator (Coupon Search)](#10-walkthrough-negotiator-coupon-search)
+- [11. Walkthrough: Therapist (Reflection)](#11-walkthrough-therapist-reflection)
+- [12. Dashboard & History](#12-dashboard--history)
+- [13. Ghost Cards](#13-ghost-cards)
+- [14. Opik Observability Traces](#14-opik-observability-traces)
+- [15. What Demo Mode Changes](#15-what-demo-mode-changes)
 - [Appendix: Example Prompts by Tier](#appendix-example-prompts-by-tier)
 
 ---
@@ -27,10 +36,11 @@ In `apps/web/.env`, set:
 
 ```env
 DEMO_MODE=true
+NEXT_PUBLIC_DEMO_MODE=true
 ```
 
 This activates:
-- **"DEMO" badge** — small pill in the bottom-left corner of every page
+- **Floating Demo Panel** — interactive pill in the bottom-left corner with profile switching, guided tour
 - **Deterministic AI** — `temperature: 0` and `seed: 42` for reproducible outputs
 - **Mock coupon provider** — returns realistic coupons without a real API
 - **Seed script safety gate** — allows running `db:seed:rookie` and `db:seed:pro`
@@ -87,21 +97,107 @@ Running either seed command automatically **cleans existing demo data first** �
 bun dev
 ```
 
-Open `http://localhost:3001`. You should see the **"DEMO"** badge in the bottom-left corner.
+Open `http://localhost:3001`. You should see the **"DEMO"** pill in the bottom-left corner.
 
 ## 4. Create an Account & Sign In
 
 1. Click **"See Pause in Action"** on the landing page (or navigate to `/login`)
-2. If using seed data, sign in with:
-   - Email: `alex@demo.pause.app`
-   - Password: *(set during account creation — seeds don't set a password, so create an account first, then re-seed)*
+2. Click **"Try Demo as Alex"** to sign in with the pre-seeded demo account
+3. You'll be redirected to the dashboard
 
 **Recommended flow for judges:**
-1. **Deployed app:** Create an account at `/login` — the Pro seed data (Alex + history) is already in the database
-2. **Local:** Create a fresh account, then run `db:seed:rookie` or `db:seed:pro` to populate demo data
-3. Or simply use the app as-is — every new user starts with an empty Skillbook
+1. **Deployed app:** Click "Try Demo as Alex" — the Pro seed data (Alex + history) is already in the database
+2. **Local:** Click "Try Demo as Alex" after running `db:seed:rookie` or `db:seed:pro`
+3. Or create a fresh account — every new user starts with an empty Skillbook
 
-## 5. Floating AI Chat (Try This First!)
+## 5. Floating Demo Panel
+
+The **DEMO** pill in the bottom-left corner is an interactive control panel for judges. Click it to reveal a glassmorphic menu.
+
+### What It Shows
+
+The menu adapts based on context:
+
+| Page | Menu Items | Why |
+|------|-----------|-----|
+| Home (`/`) | Rookie Profile, Pro Profile | Browse both profiles (sign in first to switch) |
+| Login (`/login`) | Rookie Profile, Pro Profile | Same as home |
+| Dashboard (`/dashboard`) | *Opposite* profile only, Start Guided Tour | Already signed in — only show what you can switch to |
+
+### Profile Switching (Dashboard Only)
+
+When signed in on the dashboard, click a profile to **instantly switch** between Rookie and Pro:
+
+1. Click the **DEMO** pill
+2. Click **"Rookie Profile"** or **"Pro Profile"**
+3. A loading spinner appears while data is re-seeded
+4. The dashboard reloads with the new profile data — **you stay signed in** (no re-login needed)
+5. The menu now shows only the opposite profile
+
+**What changes:**
+
+| | Rookie | Pro |
+|--|--------|-----|
+| Savings | $0.00 | $53.00 |
+| Interactions | 0 | 6 |
+| Skillbook | Empty | 4 strategies |
+| Ghost Cards | None | 1 pending |
+| Good Friction Score | 0% | 83% |
+
+### Animations
+
+- **Entrance pulse** — a 3-second glow animation on first page load draws attention to the pill
+- **Shimmer sweep** — a subtle light sweep loops across the pill surface
+- **Spring menu** — the menu card appears with a spring animation and staggered item reveal
+- All animations respect `prefers-reduced-motion`
+
+### Interactions
+
+- **Click outside** closes the menu
+- **Escape key** closes the menu
+- **Loading state** disables all menu items during a profile switch
+
+## 6. Guided Tour
+
+A 6-step product tour walks judges through every key feature on the dashboard. Powered by [OnboardJS](https://github.com/AshrafElshaer/onboard-js) (headless, zero dependencies).
+
+### How to Start
+
+1. Sign in and navigate to the **Dashboard**
+2. Click the **DEMO** pill
+3. Click **"Start Guided Tour"** (only visible on the dashboard)
+
+### Tour Steps
+
+| Step | Feature | What It Highlights |
+|------|---------|-------------------|
+| 1 | Demo Panel | "Switch between profiles or start the tour from here" |
+| 2 | Card Vault | "Click a card to request an unlock and trigger the AI Guardian" |
+| 3 | AI Chat | "Ask questions about Pause — uses the ACE self-learning framework" |
+| 4 | Interaction History | "Every Guardian decision with risk scores and outcomes" |
+| 5 | Savings Tracker | "Total savings from coupons found by the Negotiator tier" |
+| 6 | Ghost Cards | "Past purchases resurface for reflection — feedback trains the AI" |
+
+### Tour Controls
+
+- **Next / Previous** — navigate between steps
+- **Close (X)** — exit the tour at any point
+- **Finish** — appears on the last step to complete the tour
+- **Progress dots** — visual indicator showing current position
+- **Spotlight overlay** — highlights the target element with a radial gradient cutout
+- Each step **auto-scrolls** the target element into view
+
+### Design
+
+The tour card uses a glassmorphic design matching Pause's aesthetic:
+- `oklch` color space throughout
+- Backdrop blur with translucent background
+- Spring animations on card transitions
+- Spotlight overlay dims the rest of the page
+
+---
+
+## 7. Floating AI Chat (Try This First!)
 
 The floating chat bubble in the **bottom-right corner** is the fastest way to experience Pause's AI — no sign-in required.
 
@@ -165,7 +261,7 @@ The chat is context-aware:
 
 ---
 
-## 6. The Three AI Tiers
+## 8. The Three AI Tiers
 
 Pause routes every purchase through a **risk assessment engine** that scores 0-100. The score determines which AI tier responds:
 
@@ -177,7 +273,7 @@ Score 70-100 →  Therapist (reflection prompts, wait option)
 
 Risk factors include: purchase amount, category, time of day, user history, and spending patterns.
 
-## 7. Walkthrough: Analyst (Auto-Approve)
+## 9. Walkthrough: Analyst (Auto-Approve)
 
 **What it does:** Low-risk purchases are approved instantly with no friction.
 
@@ -197,7 +293,7 @@ Risk factors include: purchase amount, category, time of day, user history, and 
 - No coupons or reflection prompts — just a quick approval
 - The interaction is recorded in your dashboard history
 
-## 8. Walkthrough: Negotiator (Coupon Search)
+## 10. Walkthrough: Negotiator (Coupon Search)
 
 **What it does:** Medium-risk purchases trigger a coupon search. The AI finds deals before you unlock.
 
@@ -229,7 +325,7 @@ Risk factors include: purchase amount, category, time of day, user history, and 
 - Savings Ticket component with coupon code and discount amount
 - Savings counter updates on the dashboard
 
-## 9. Walkthrough: Therapist (Reflection)
+## 11. Walkthrough: Therapist (Reflection)
 
 **What it does:** High-risk purchases trigger therapeutic reflection techniques. The AI helps you pause and think.
 
@@ -256,7 +352,7 @@ Risk factors include: purchase amount, category, time of day, user history, and 
 - If the Skillbook has learned strategies, they influence which technique the AI picks
 - The banned-terminology filter ensures the AI never uses clinical/diagnostic language
 
-## 10. Dashboard & History
+## 12. Dashboard & History
 
 Navigate to `/dashboard` to see:
 
@@ -271,7 +367,7 @@ Navigate to `/dashboard` to see:
 
 **With Pro seed data**, you'll see 6 pre-populated interactions spanning all three tiers, $53 in savings, and a trained Skillbook.
 
-## 11. Ghost Cards
+## 13. Ghost Cards
 
 **Ghost of Spending Past** resurfaces past purchases for reflection.
 
@@ -292,7 +388,7 @@ User feedback → ACE Reflector analyzes
 Skillbook updated → Better future responses
 ```
 
-## 12. Opik Observability Traces
+## 14. Opik Observability Traces
 
 If `OPIK_API_KEY` is configured, every Guardian interaction generates full traces:
 
@@ -309,14 +405,16 @@ View traces at [comet.com/opik](https://www.comet.com/opik) under your project.
 - Strategy prediction logs (what the AI expected vs. what happened)
 - Feedback scores attached to traces for quality assessment
 
-## 13. What Demo Mode Changes
+## 15. What Demo Mode Changes
 
 | Feature | DEMO_MODE=false | DEMO_MODE=true |
 |---------|----------------|----------------|
 | AI Temperature | Model default | `temperature: 0` (deterministic) |
 | AI Seed | None | `seed: 42` (reproducible) |
 | Coupon Provider | Real API (returns empty) | Mock coupons with realistic data |
-| UI Badge | Hidden | "DEMO" pill in bottom-left corner |
+| Demo Panel | Hidden | Floating "DEMO" pill with profile switching + guided tour |
+| Profile Switching | Unavailable | Switch between Rookie/Pro via `POST /api/demo/switch-profile` |
+| Guided Tour | Unavailable | 6-step OnboardJS tour of dashboard features |
 | Seed Scripts | Blocked (safety gate) | Allowed |
 
 **Everything else works identically** — auth, database, Skillbook learning, Ghost Cards, dashboard, and Opik tracing all function the same in both modes.
@@ -367,6 +465,7 @@ Spontaneous vacation booking - $3,500
 ```bash
 # Enable demo mode
 echo "DEMO_MODE=true" >> apps/web/.env
+echo "NEXT_PUBLIC_DEMO_MODE=true" >> apps/web/.env
 
 # Seed fresh user
 bun run db:seed:rookie
@@ -377,6 +476,6 @@ bun run db:seed:pro
 # Start app
 bun dev
 
-# Run tests (1337 tests, all passing)
-bun test
+# Run tests (1333 tests, all passing)
+bunx vitest run
 ```
