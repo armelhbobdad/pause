@@ -10,7 +10,10 @@ export const searchCouponsTool = tool({
   description:
     "Search for applicable deals, coupons, or promo codes for a purchase",
   inputSchema: z.object({
-    merchant: z.string().describe("The merchant or store name"),
+    merchant: z
+      .string()
+      .optional()
+      .describe("The merchant or store name, if known"),
     category: z
       .string()
       .describe("Product category (e.g., electronics, fashion, grocery)"),

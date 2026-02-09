@@ -768,7 +768,7 @@ describe("Guardian Route Handler", () => {
         true,
         undefined,
         undefined,
-        undefined,
+        "test",
         expect.objectContaining({ strategy_id: "auto_approve" })
       );
     });
@@ -856,7 +856,7 @@ describe("Guardian Route Handler", () => {
         false,
         undefined,
         undefined,
-        undefined,
+        "test",
         expect.objectContaining({ strategy_id: "coupon_search" })
       );
     });
@@ -993,7 +993,7 @@ describe("Guardian Route Handler", () => {
         true,
         undefined,
         undefined,
-        undefined,
+        "test",
         expect.objectContaining({ strategy_id: "auto_approve" })
       );
     });
@@ -1015,7 +1015,7 @@ describe("Guardian Route Handler", () => {
         false,
         undefined,
         undefined,
-        undefined,
+        "test",
         expect.objectContaining({ strategy_id: "default" })
       );
     });
@@ -1504,6 +1504,7 @@ describe("Guardian Route Handler", () => {
       expect(updateReturn?.set).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: {
+            purchaseContext: "test",
             banned_terms_replaced: [
               { original: "addiction", replacement: "pattern" },
             ],

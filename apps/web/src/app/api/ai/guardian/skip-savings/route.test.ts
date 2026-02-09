@@ -240,12 +240,12 @@ describe("Skip Savings Route Handler", () => {
   // Status Guard
   // ========================================================================
 
-  it("returns 409 when interaction status is not completed", async () => {
+  it("returns 409 when interaction status is not completed or pending", async () => {
     mocks.interactionResult = [
       {
         id: "int-123",
         userId: "user-1",
-        status: "pending",
+        status: "feedback_received",
         outcome: null,
       },
     ];

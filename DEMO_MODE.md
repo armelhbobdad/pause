@@ -314,7 +314,7 @@ View traces at [comet.com/opik](https://www.comet.com/opik) under your project.
 | AI Temperature | Model default | `temperature: 0` (deterministic) |
 | AI Seed | None | `seed: 42` (reproducible) |
 | Coupon Provider | Real API (returns empty) | Mock coupons with realistic data |
-| UI Badge | Hidden | "DEMO" pill in top-right corner |
+| UI Badge | Hidden | "DEMO" pill in bottom-left corner |
 | Seed Scripts | Blocked (safety gate) | Allowed |
 
 **Everything else works identically** — auth, database, Skillbook learning, Ghost Cards, dashboard, and Opik tracing all function the same in both modes.

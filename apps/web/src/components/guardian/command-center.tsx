@@ -306,7 +306,6 @@ function CommandCenterInner({
       >
         <input
           aria-label="Describe your purchase"
-          // biome-ignore lint/a11y/noAutofocus: Guardian conversation auto-focuses input for immediate purchase entry
           autoFocus
           onChange={(e) => setPurchaseInput(e.target.value)}
           placeholder="What are you buying? e.g. Bluetooth speaker - $79"

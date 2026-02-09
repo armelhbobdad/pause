@@ -71,10 +71,13 @@ export async function POST(req: Request) {
     return Response.json({ error: "Access denied" }, { status: 403 });
   }
 
-  // Status guard: only allow skip on completed interactions
-  if (existingInteraction.status !== "completed") {
+  // Status guard: allow skip on pending (stream still finishing) or completed
+  if (
+    existingInteraction.status !== "completed" &&
+    existingInteraction.status !== "pending"
+  ) {
     return Response.json(
-      { error: "Interaction not in completed state" },
+      { error: "Interaction not in valid state" },
       { status: 409 }
     );
   }

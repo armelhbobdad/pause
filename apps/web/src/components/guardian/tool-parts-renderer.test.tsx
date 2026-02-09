@@ -309,15 +309,20 @@ function makeMessage(
 }
 
 function makeValidOffer(overrides: Record<string, unknown> = {}) {
+  // Matches the real tool execute output: { bestOffer, allResultsCount, selectionReasoning }
   return {
-    code: "SAVE20",
-    discount: "20% OFF",
-    discountCents: 2000,
-    type: "percentage",
-    source: "TestStore",
-    expiresAt: null,
+    bestOffer: {
+      code: "SAVE20",
+      discount: "20% OFF",
+      discountCents: 2000,
+      type: "percentage",
+      source: "TestStore",
+      expiresAt: null,
+      selectionReasoning: "Best deal",
+      ...overrides,
+    },
+    allResultsCount: 3,
     selectionReasoning: "Best deal",
-    ...overrides,
   };
 }
 
