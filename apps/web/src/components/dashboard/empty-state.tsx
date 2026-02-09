@@ -29,12 +29,19 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-3 py-8 text-center",
+        "glass-card flex flex-col items-center gap-3 py-8 text-center",
         className
       )}
       data-testid="empty-state"
     >
-      <div aria-hidden="true" className="text-muted-foreground">
+      <div
+        aria-hidden="true"
+        className="flex h-14 w-14 items-center justify-center rounded-full text-muted-foreground"
+        style={{
+          background:
+            "radial-gradient(circle, oklch(0.25 0.02 250 / 60%), transparent 70%)",
+        }}
+      >
         {icon}
       </div>
       <div className="flex flex-col gap-1">

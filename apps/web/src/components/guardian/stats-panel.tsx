@@ -71,15 +71,7 @@ export function StatsPanel({
   const panelId = "stats-panel-content";
 
   return (
-    <div
-      className="rounded-2xl border p-4"
-      data-testid="stats-panel"
-      style={{
-        background: "var(--pause-glass)",
-        backdropFilter: "blur(var(--pause-blur-medium))",
-        borderColor: "var(--pause-border-base)",
-      }}
-    >
+    <div className="glass-card rounded-2xl p-4" data-testid="stats-panel">
       <button
         aria-controls={panelId}
         aria-expanded={expanded}
@@ -112,7 +104,10 @@ export function StatsPanel({
             className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
             data-testid="stats-grid"
           >
-            <div className="flex flex-col" data-testid="stat-total-saved">
+            <div
+              className="stat-card flex flex-col"
+              data-testid="stat-total-saved"
+            >
               <span className="text-muted-foreground text-xs">Total Saved</span>
               <span
                 className="font-bold text-lg"
@@ -121,7 +116,7 @@ export function StatsPanel({
                 {formatCentsToDollars(totalSavedCents)}
               </span>
             </div>
-            <div className="flex flex-col" data-testid="stat-streak">
+            <div className="stat-card flex flex-col" data-testid="stat-streak">
               <span className="text-muted-foreground text-xs">Streak</span>
               <span
                 className="font-bold text-lg"
@@ -130,7 +125,7 @@ export function StatsPanel({
                 {streak}
               </span>
             </div>
-            <div className="flex flex-col" data-testid="stat-pauses">
+            <div className="stat-card flex flex-col" data-testid="stat-pauses">
               <span className="text-muted-foreground text-xs">Pauses</span>
               <span
                 className="font-bold text-lg"
@@ -139,7 +134,10 @@ export function StatsPanel({
                 {pauses}
               </span>
             </div>
-            <div className="flex flex-col" data-testid="stat-friction-score">
+            <div
+              className="stat-card flex flex-col"
+              data-testid="stat-friction-score"
+            >
               <span className="text-muted-foreground text-xs">
                 Good Friction Score
               </span>

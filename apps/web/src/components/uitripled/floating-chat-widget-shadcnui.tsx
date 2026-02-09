@@ -295,11 +295,19 @@ export function FloatingChatWidget({
           "max-sm:mb-[env(safe-area-inset-bottom)]",
           isOpen
             ? "bg-destructive text-destructive-foreground"
-            : "bg-primary text-primary-foreground hover:shadow-primary/25"
+            : "text-primary-foreground hover:shadow-primary/25"
         )}
         onClick={toggleOpen}
         ref={bubbleRef}
-        style={{ transitionDuration: "var(--pause-transition-normal)" }}
+        style={
+          isOpen
+            ? { transitionDuration: "var(--pause-transition-normal)" }
+            : {
+                transitionDuration: "var(--pause-transition-normal)",
+                background:
+                  "linear-gradient(135deg, var(--hero-gradient-start), var(--hero-gradient-end))",
+              }
+        }
         type="button"
         whileHover={shouldReduceMotion ? {} : { scale: 1.05 }}
         whileTap={shouldReduceMotion ? {} : { scale: 0.95 }}

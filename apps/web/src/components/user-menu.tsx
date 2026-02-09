@@ -10,8 +10,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { NativeButton } from "@/components/uitripled/native-button-shadcnui";
 import { authClient } from "@/lib/auth-client";
-
 import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 
@@ -26,7 +26,7 @@ export default function UserMenu() {
   if (!session) {
     return (
       <Link href="/login">
-        <Button variant="outline">Sign In</Button>
+        <NativeButton variant="outline">Sign In</NativeButton>
       </Link>
     );
   }

@@ -264,6 +264,14 @@ export function GhostCardFeed({
       role="feed"
       style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
     >
+      {!isLoading && mappedCards.length > 0 && (
+        <h3
+          className="font-medium text-sm"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          Spending Reflections
+        </h3>
+      )}
       {isLoading && <FeedSkeleton />}
       {showEmpty && <FeedEmptyState />}
       {!isLoading &&

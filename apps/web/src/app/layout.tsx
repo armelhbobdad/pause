@@ -25,8 +25,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "pause",
-  description: "pause",
+  title: "Pause — AI-Powered Good Friction for Mindful Spending",
+  description:
+    "Your AI Guardian analyzes every purchase in real-time using the ACE self-learning framework, with full observability via Opik traces.",
 };
 
 export default function RootLayout({

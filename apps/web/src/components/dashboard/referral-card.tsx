@@ -38,10 +38,10 @@ export function ReferralCard({ consecutiveOverrides }: ReferralCardProps) {
 
   return (
     <div
+      className="glass-card"
       data-testid="referral-card"
       style={{
-        backgroundColor: "oklch(0.92 0.02 250)",
-        color: "oklch(0.45 0.02 250)",
+        color: "var(--text-secondary)",
         borderRadius: "12px",
         padding: "16px",
         position: "relative",

@@ -6,10 +6,10 @@ import { useState } from "react";
 import z from "zod";
 
 import { NativeButton } from "@/components/uitripled/native-button-shadcnui";
+import { NativeInput } from "@/components/uitripled/native-input-shadcnui";
 import { authClient } from "@/lib/auth-client";
 
 import Loader from "./loader";
-import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
 export default function SignInForm({
@@ -59,13 +59,14 @@ export default function SignInForm({
 
   return (
     <div
-      className="glass-panel mx-auto mt-10 w-full max-w-[480px] rounded-2xl border p-6"
+      className="glass-panel mx-auto mt-0 w-full max-w-[480px] rounded-2xl border p-6"
       data-glass
       style={{
         background: "var(--pause-glass)",
         backdropFilter: "blur(var(--pause-blur-medium))",
         WebkitBackdropFilter: "blur(var(--pause-blur-medium))",
         borderColor: "oklch(1 0 0 / 0.15)",
+        boxShadow: "0 8px 32px oklch(0 0 0 / 0.3)",
       }}
     >
       <h1 className="mb-6 text-center font-bold text-3xl">Welcome Back</h1>
@@ -83,7 +84,7 @@ export default function SignInForm({
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Email</Label>
-                <Input
+                <NativeInput
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}
@@ -110,7 +111,7 @@ export default function SignInForm({
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Password</Label>
-                <Input
+                <NativeInput
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}

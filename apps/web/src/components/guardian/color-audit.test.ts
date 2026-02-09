@@ -14,7 +14,7 @@ const EXCLUDE_PATTERNS = [
   ".test.", // test files
   "tokens.css", // token definitions
   "index.css", // global CSS
-  "native-badge-carbon.tsx", // uitripled vendored component
+  "uitripled/", // uitripled vendored components
 ];
 
 function getComponentFiles(dir: string): string[] {

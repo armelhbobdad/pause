@@ -146,6 +146,28 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
   --space-16: 4rem;
+
+  /* ==========================================================================
+   * Visual Rebrand Tokens (UI/UX Overhaul)
+   * Cool-blue accent system for luxury fintech aesthetic
+   * ========================================================================== */
+
+  /* Accent Glow (interactive highlights) */
+  --accent-glow: oklch(0.75 0.15 250);
+  --accent-glow-subtle: oklch(0.85 0.08 250);
+
+  /* Hero Gradient (landing page headline) */
+  --hero-gradient-start: oklch(0.85 0.12 250);
+  --hero-gradient-mid: oklch(0.8 0.14 280);
+  --hero-gradient-end: oklch(0.9 0.1 200);
+
+  /* Elevated Surfaces */
+  --surface-elevated: oklch(0.18 0.01 250);
+  --surface-hover: oklch(0.22 0.015 250);
+
+  /* Text Hierarchy */
+  --text-hero: oklch(0.97 0.005 250);
+  --text-secondary: oklch(0.7 0.02 250);
 }
 
 /* Shimmer Loading Animation (Story 4.4, AC#5)
@@ -278,6 +300,51 @@
 /* Tabular nums utility — monospaced digits for counters (Story 10.5, AC#15) */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* Hero Shimmer — Subtle gradient sweep for hero text (Visual Rebrand) */
+@keyframes hero-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Fade In Up — Staggered reveal for content sections (Visual Rebrand) */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Vault Glow — Ambient card glow pulse (Visual Rebrand) */
+@keyframes vault-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 30px oklch(0.75 0.15 250 / 0.08);
+  }
+  50% {
+    box-shadow: 0 0 50px oklch(0.75 0.15 250 / 0.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-gradient-hero,
+  .vault-glow,
+  [data-hero-animate] {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
 }
 
 @media (forced-colors: active) {

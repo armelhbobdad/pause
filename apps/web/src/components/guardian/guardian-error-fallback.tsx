@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { NativeButton } from "@/components/uitripled/native-button-shadcnui";
 
 // ============================================================================
 // Types
@@ -65,14 +65,14 @@ export function GuardianErrorFallback({
       <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
         {/* Manual Unlock button — neutral styling, not destructive red (AC#2)
             Unlock is a positive action per Bodyguard frame */}
-        <Button onClick={onManualUnlock} size="sm" variant="outline">
+        <NativeButton onClick={onManualUnlock} size="sm" variant="outline">
           Manual Unlock
-        </Button>
+        </NativeButton>
 
         {onDismiss && (
-          <Button onClick={onDismiss} size="sm" variant="ghost">
+          <NativeButton onClick={onDismiss} size="sm" variant="ghost">
             Dismiss
-          </Button>
+          </NativeButton>
         )}
       </div>
     </div>

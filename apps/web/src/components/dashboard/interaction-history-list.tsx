@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { NativeButton } from "@/components/uitripled/native-button-shadcnui";
 
 import { HistoryEmptyState } from "./empty-states";
 import { InteractionDetail } from "./interaction-detail";
@@ -157,14 +156,15 @@ export function InteractionHistoryList() {
 
       {nextCursor && (
         <div className="flex justify-center py-3">
-          <Button
+          <NativeButton
             data-testid="load-more-button"
             disabled={isLoadingMore}
+            loading={isLoadingMore}
             onClick={() => fetchInteractions(nextCursor)}
             variant="ghost"
           >
-            {isLoadingMore ? "Loading..." : "Load more"}
-          </Button>
+            Load more
+          </NativeButton>
         </div>
       )}
     </div>

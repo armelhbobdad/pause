@@ -65,7 +65,7 @@ export function SavingsCounter({ totalCents }: SavingsCounterProps) {
   return (
     <output
       aria-live="polite"
-      className="flex items-baseline gap-1"
+      className="glass-card flex items-baseline gap-1 px-4 py-3"
       data-testid="savings-counter"
     >
       <span

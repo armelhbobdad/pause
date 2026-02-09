@@ -12,6 +12,7 @@ import { GhostCardFeed } from "@/components/guardian/ghost-card-feed";
 import { GhostCardManagerProvider } from "@/components/guardian/ghost-card-manager";
 import { StatsPanel } from "@/components/guardian/stats-panel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CreditCard } from "@/components/uitripled/credit-card";
 import { useFirstInteractionCelebration } from "@/hooks/use-first-interaction-celebration";
 import { getLayoutMode } from "@/lib/guardian/layout-mode";
 import { trpc } from "@/utils/trpc";
@@ -90,9 +91,14 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-full flex-col" data-layout-mode={layoutMode}>
-      {/* Card Vault area (~40vh) — read-only resting state */}
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
-        <div className="text-muted-foreground text-sm">Card Vault</div>
+      {/* Card Vault area (~35vh) — interactive 3D credit card */}
+      <div className="flex min-h-[35vh] flex-col items-center justify-center gap-2">
+        <CreditCard
+          cardholderName="GUARDIAN PROTECTED"
+          cardNumber="4242 4242 4242 4242"
+          cvv="***"
+          expiryDate="12/28"
+        />
         {(isNewUser || celebrating) && (
           <p
             className="text-muted-foreground text-sm"
