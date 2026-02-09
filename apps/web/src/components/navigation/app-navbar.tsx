@@ -22,7 +22,7 @@ export function AppNavbar() {
 
   return (
     <nav
-      className="flex items-center justify-between px-5 py-2.5"
+      className="relative z-[var(--z-float)] flex items-center justify-between px-5 py-2.5"
       data-navbar
       style={{
         background: "oklch(0.1 0.005 250 / 60%)",

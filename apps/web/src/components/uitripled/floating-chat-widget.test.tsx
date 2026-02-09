@@ -243,11 +243,14 @@ describe("FloatingChatWidget", () => {
       const input = screen.getByPlaceholderText("Ask Pause anything...");
       // Type text so the send button becomes enabled (disabled buttons can't receive focus)
       await user.type(input, "test");
+      const sendButton = screen.getByRole("button", { name: "Send message" });
+      await vi.waitFor(() => {
+        expect(sendButton).not.toBeDisabled();
+        expect(input).toHaveFocus();
+      });
       await user.keyboard("{Tab}");
       // Focus should be on the send button
-      expect(document.activeElement?.getAttribute("aria-label")).toBe(
-        "Send message"
-      );
+      expect(sendButton).toHaveFocus();
     });
 
     it("Tab from close button wraps back to input", async () => {

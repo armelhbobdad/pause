@@ -53,10 +53,10 @@ export default function UserMenu() {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("click", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
   }, [open]);
@@ -169,14 +169,11 @@ export default function UserMenu() {
               <span className="truncate">{session.user.email}</span>
             </motion.div>
 
-            {/* Sign Out — onMouseDown fires before document handler can close menu */}
+            {/* Sign Out */}
             <button
               className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/5"
               onClick={() => {
-                window.location.href = "/api/sign-out";
-              }}
-              onMouseDown={() => {
-                window.location.href = "/api/sign-out";
+                window.location.assign("/api/sign-out");
               }}
               role="menuitem"
               style={{ color: "oklch(0.65 0.14 25)" }}
