@@ -169,16 +169,22 @@ export default function UserMenu() {
               <span className="truncate">{session.user.email}</span>
             </motion.div>
 
-            {/* Sign Out */}
-            <a
+            {/* Sign Out — onMouseDown fires before document handler can close menu */}
+            <button
               className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/5"
-              href="/api/sign-out"
+              onClick={() => {
+                window.location.href = "/api/sign-out";
+              }}
+              onMouseDown={() => {
+                window.location.href = "/api/sign-out";
+              }}
               role="menuitem"
               style={{ color: "oklch(0.65 0.14 25)" }}
+              type="button"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>Sign Out</span>
-            </a>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
