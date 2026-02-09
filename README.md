@@ -71,6 +71,8 @@ graph TB
 - **Coupon Search** — Negotiator tier finds real savings and applies them before you unlock your card
 - **Reflection Prompts** — Therapist tier guides you through evidence-based spending reflection techniques
 
+- **Floating Chat** — Always-accessible AI assistant that answers questions about your spending and Pause features, with smart availability based on Guardian state
+
 ### Learning & Feedback
 
 - **[ACE Learning](packages/ace/README.md)** — Self-improving Skillbook learns your spending patterns and gets smarter with every interaction
@@ -80,7 +82,7 @@ graph TB
 
 - **Dashboard** — Interaction history, savings counter, and learning visualization
 - **Opik Observability** — Full trace pipeline with reasoning summaries, strategy predictions, and feedback scores
-- **Demo Mode** — Pre-seeded data and deterministic AI for live demonstrations
+- **[Demo Mode](DEMO_MODE.md)** — Pre-seeded data and deterministic AI for live demonstrations ([full judges' guide](DEMO_MODE.md))
 
 ## How It Works
 

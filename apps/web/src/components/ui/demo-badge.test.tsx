@@ -32,8 +32,8 @@ describe("DemoBadge", () => {
       render(<DemoBadge />);
       const badge = screen.getByRole("status");
       expect(badge.style.position).toBe("fixed");
-      expect(badge.style.top).toBe("8px");
-      expect(badge.style.right).toBe("8px");
+      expect(badge.style.bottom).toBe("16px");
+      expect(badge.style.left).toBe("60px");
       expect(badge.style.zIndex).toBe("50");
     });
 
