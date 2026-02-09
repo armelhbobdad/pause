@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { LogOut, Mail } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "./ui/skeleton";
@@ -36,32 +36,30 @@ const itemVariants = {
 export default function UserMenu() {
   const { data: session, isPending } = authClient.useSession();
   const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
-
-  const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
     if (!open) {
       return;
     }
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        close();
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
       }
     };
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        close();
+        setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("click", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [open, close]);
+  }, [open]);
 
   if (isPending) {
     return <Skeleton className="h-8 w-8 rounded-full" />;
@@ -92,7 +90,7 @@ export default function UserMenu() {
     .slice(0, 2);
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative" ref={ref}>
       <button
         aria-expanded={open}
         aria-haspopup="menu"
@@ -172,33 +170,18 @@ export default function UserMenu() {
             </motion.div>
 
             {/* Sign Out */}
-            <motion.button
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors"
-              custom={2}
-              onClick={async () => {
-                try {
-                  await fetch("/api/auth/sign-out", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({}),
-                  });
-                } finally {
-                  window.location.href = "/";
-                }
+            <button
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/5"
+              onClick={() => {
+                window.location.assign("/api/sign-out");
               }}
               role="menuitem"
               style={{ color: "oklch(0.65 0.14 25)" }}
               type="button"
-              variants={shouldReduceMotion ? undefined : itemVariants}
-              whileHover={
-                shouldReduceMotion
-                  ? undefined
-                  : { x: 2, backgroundColor: "oklch(0.65 0.14 25 / 0.08)" }
-              }
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>Sign Out</span>
-            </motion.button>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

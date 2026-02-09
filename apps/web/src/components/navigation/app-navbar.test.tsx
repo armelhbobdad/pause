@@ -52,6 +52,14 @@ describe("AppNavbar (Story 10.1)", () => {
     expect(nav).toHaveAttribute("data-navbar");
   });
 
+  it("renders above page content for dropdown interactions", () => {
+    render(<AppNavbar />);
+
+    const nav = screen.getByRole("navigation");
+    expect(nav.className).toContain("relative");
+    expect(nav.className).toContain("z-[var(--z-float)]");
+  });
+
   it("highlights Dashboard when on /dashboard (source check)", () => {
     // happy-dom does not support oklch() values — verify via source analysis
     const { readFileSync } = require("node:fs");
