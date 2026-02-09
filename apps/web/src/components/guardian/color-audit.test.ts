@@ -16,6 +16,7 @@ const EXCLUDE_PATTERNS = [
   "index.css", // global CSS
   "uitripled/", // uitripled vendored components
   "card-vault.tsx", // glassmorphism card uses intentional oklch/rgba colors
+  "card-vault-inner.tsx", // Framer Motion animate props require rgba (oklch not animatable)
 ];
 
 function getComponentFiles(dir: string): string[] {

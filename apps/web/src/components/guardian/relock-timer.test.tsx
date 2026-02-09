@@ -113,12 +113,27 @@ describe("RelockTimer", () => {
     expect(bar.style.transform).toBe("scaleX(1)");
   });
 
-  it("is hidden from screen readers via aria-hidden", () => {
+  it("has timer role with accessible label", () => {
     render(
       <RelockTimer durationMs={300_000} isActive={true} onExpire={vi.fn()} />
     );
 
     const timer = screen.getByTestId("relock-timer");
-    expect(timer.getAttribute("aria-hidden")).toBe("true");
+    expect(timer.getAttribute("role")).toBe("timer");
+    expect(timer.getAttribute("aria-label")).toContain("Card will relock in");
+  });
+
+  it("displays time remaining label", () => {
+    render(
+      <RelockTimer durationMs={300_000} isActive={true} onExpire={vi.fn()} />
+    );
+
+    expect(screen.getByText("5:00")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(61_000);
+    });
+
+    expect(screen.getByText("3:59")).toBeInTheDocument();
   });
 });

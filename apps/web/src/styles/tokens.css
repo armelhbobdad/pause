@@ -84,7 +84,7 @@
   --relock-green: oklch(0.72 0.18 145);
   --relock-yellow: oklch(0.78 0.16 85);
   --relock-red: oklch(0.65 0.22 25);
-  --relock-bar-height: 3px;
+  --relock-bar-height: 4px;
 
   /* Typography
      ADR: Geist Sans is Next.js default; JetBrains Mono for data/codes
