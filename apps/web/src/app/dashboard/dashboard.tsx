@@ -8,13 +8,12 @@ import { ReferralCard } from "@/components/dashboard/referral-card";
 import { SavingsBreakdown } from "@/components/dashboard/savings-breakdown";
 import { SavingsCounter } from "@/components/dashboard/savings-counter";
 import { SavingsSummary } from "@/components/dashboard/savings-summary";
+import { CommandCenter } from "@/components/guardian/command-center";
 import { GhostCardFeed } from "@/components/guardian/ghost-card-feed";
 import { GhostCardManagerProvider } from "@/components/guardian/ghost-card-manager";
 import { StatsPanel } from "@/components/guardian/stats-panel";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CreditCard } from "@/components/uitripled/credit-card";
 import { useFirstInteractionCelebration } from "@/hooks/use-first-interaction-celebration";
-import { getLayoutMode } from "@/lib/guardian/layout-mode";
 import { trpc } from "@/utils/trpc";
 
 function DashboardSkeleton() {
@@ -36,6 +35,10 @@ export default function Dashboard() {
     refetchOnWindowFocus: true,
   });
 
+  const { data: cardData, isLoading: cardLoading } = useQuery(
+    trpc.dashboard.getCard.queryOptions()
+  );
+
   const { data: savingsData, isLoading: savingsLoading } = useQuery({
     ...trpc.savings.getSummary.queryOptions(),
     staleTime: 30_000,
@@ -56,7 +59,7 @@ export default function Dashboard() {
     }
   }, [error]);
 
-  if (isLoading) {
+  if (isLoading || cardLoading) {
     return <DashboardSkeleton />;
   }
 
@@ -84,90 +87,79 @@ export default function Dashboard() {
     return null;
   }
 
-  const isNewUser = data.interactionCount === 0;
-  const guardianState = "idle" as const;
-  const layoutMode = getLayoutMode(guardianState);
-  const isFocused = layoutMode === "focused";
+  // Map DB card to CardVault's CardData shape
+  const card = cardData
+    ? {
+        id: cardData.id,
+        userId: cardData.userId,
+        lastFour: cardData.lastFour,
+        nickname: cardData.nickname,
+        status: cardData.status as "active" | "locked" | "removed",
+        lockedAt: cardData.lockedAt ? new Date(cardData.lockedAt) : null,
+        unlockedAt: cardData.unlockedAt ? new Date(cardData.unlockedAt) : null,
+        createdAt: new Date(cardData.createdAt),
+        updatedAt: new Date(cardData.updatedAt),
+      }
+    : null;
+
+  const feedContent = (
+    <div
+      className="flex flex-col gap-3 px-4 pb-4"
+      data-celebrate={celebrating || undefined}
+      data-testid="dashboard-feed"
+      style={{
+        maxWidth: "960px",
+        margin: "0 auto",
+        width: "100%",
+        animation: celebrating ? "celebrate-pulse 0.3s ease-out" : undefined,
+      }}
+    >
+      <SavingsSummary
+        acceptanceRate={data.acceptanceRate}
+        interactionCount={data.interactionCount}
+        totalSavedCents={data.totalSavedCents}
+      />
+
+      {!savingsLoading && savingsData && (
+        <>
+          <SavingsCounter totalCents={savingsData.totalCents} />
+          <SavingsBreakdown
+            avgCents={savingsData.avgCents}
+            dealCount={savingsData.dealCount}
+            sourceBreakdown={savingsData.sourceBreakdown}
+            totalCents={savingsData.totalCents}
+          />
+        </>
+      )}
+
+      <StatsPanel
+        goodFrictionScore={Math.round(data.acceptanceRate)}
+        hidden={false}
+        pauses={data.interactionCount}
+        sparklineData={[]}
+        streak={0}
+        totalSavedCents={data.totalSavedCents}
+      />
+
+      <RecentInteractions interactions={data.recentInteractions} />
+
+      {referralData?.shouldShow && (
+        <ReferralCard
+          consecutiveOverrides={referralData.consecutiveOverrides}
+        />
+      )}
+
+      <GhostCardManagerProvider>
+        <GhostCardFeed />
+      </GhostCardManagerProvider>
+    </div>
+  );
 
   return (
-    <div className="flex h-full flex-col" data-layout-mode={layoutMode}>
-      {/* Card Vault area (~35vh) — interactive 3D credit card */}
-      <div className="flex min-h-[35vh] flex-col items-center justify-center gap-2">
-        <CreditCard
-          cardholderName="GUARDIAN PROTECTED"
-          cardNumber="4242 4242 4242 4242"
-          cvv="***"
-          expiryDate="12/28"
-        />
-        {(isNewUser || celebrating) && (
-          <p
-            className="text-muted-foreground text-sm"
-            data-celebrate={celebrating || undefined}
-            data-testid="onboarding-prompt"
-            style={{
-              opacity: celebrating ? 0 : 0.8,
-              transition: celebrating
-                ? "opacity 0.5s var(--ease-out-expo)"
-                : undefined,
-            }}
-          >
-            Tap to meet your Guardian
-          </p>
-        )}
-      </div>
-
-      {/* Scrollable feed (~60vh) */}
-      <div
-        className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4"
-        data-celebrate={celebrating || undefined}
-        data-testid="dashboard-feed"
-        style={{
-          maxWidth: isFocused ? "640px" : "960px",
-          margin: "0 auto",
-          width: "100%",
-          transition: "max-width var(--pause-transition-normal) ease-in-out",
-          animation: celebrating ? "celebrate-pulse 0.3s ease-out" : undefined,
-        }}
-      >
-        <SavingsSummary
-          acceptanceRate={data.acceptanceRate}
-          interactionCount={data.interactionCount}
-          totalSavedCents={data.totalSavedCents}
-        />
-
-        {!savingsLoading && savingsData && (
-          <>
-            <SavingsCounter totalCents={savingsData.totalCents} />
-            <SavingsBreakdown
-              avgCents={savingsData.avgCents}
-              dealCount={savingsData.dealCount}
-              sourceBreakdown={savingsData.sourceBreakdown}
-              totalCents={savingsData.totalCents}
-            />
-          </>
-        )}
-
-        <StatsPanel
-          goodFrictionScore={Math.round(data.acceptanceRate)}
-          hidden={isFocused}
-          pauses={data.interactionCount}
-          sparklineData={[]}
-          streak={0}
-          totalSavedCents={data.totalSavedCents}
-        />
-
-        <RecentInteractions interactions={data.recentInteractions} />
-
-        {referralData?.shouldShow && (
-          <ReferralCard
-            consecutiveOverrides={referralData.consecutiveOverrides}
-          />
-        )}
-
-        <GhostCardManagerProvider>
-          <GhostCardFeed />
-        </GhostCardManagerProvider>
-      </div>
-    </div>
+    <CommandCenter
+      card={card}
+      cardId={cardData?.id}
+      feedContent={feedContent}
+    />
   );
 }

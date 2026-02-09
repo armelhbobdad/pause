@@ -123,7 +123,7 @@ function CommandCenterInner({
     revealApproved,
     guardianError,
     relock,
-  } = useGuardianState({ onTimeout });
+  } = useGuardianState({ onTimeout, timeoutMs: 120_000 });
 
   // --- Auto-approve detection (Story 3.5) ---
   // SDK v6 doesn't expose response headers via onFinish. We intercept them
@@ -137,7 +137,8 @@ function CommandCenterInner({
   // --- useChat integration (Story 3.1, AC#18) ---
   // React Compiler memoizes the transport instance based on cardId stability.
   // If cardId is undefined, body omits it and server returns 400 → onError → break glass.
-  const { messages, status } = useChat({
+  const [purchaseInput, setPurchaseInput] = useState("");
+  const { messages, status, sendMessage } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/ai/guardian",
       body: cardId ? { cardId } : undefined,
@@ -218,18 +219,15 @@ function CommandCenterInner({
     lastActivityRef.current = Date.now();
   }
 
-  // Stream interruption monitoring (Story 2.6 AC#3, wired to useChat)
-  const { isInterrupted } = useStreamTimeout({
+  // Stream interruption monitoring (Story 2.6 AC#3, wired to useChat).
+  // NOTE: isInterrupted is tracked for UI feedback (e.g., "Connection lost" indicator)
+  // but does NOT trigger break-glass directly. Break-glass is handled exclusively by
+  // the onError callback. This avoids a race condition where the 3s stream timeout
+  // fires during initial API response latency, before onFinish/onError can run.
+  const { isInterrupted: _isInterrupted } = useStreamTimeout({
     isStreaming,
     lastActivityTimestamp: lastActivityRef.current,
   });
-
-  // When stream is interrupted, trigger break-glass fallback
-  useEffect(() => {
-    if (isInterrupted) {
-      guardianError();
-    }
-  }, [isInterrupted, guardianError]);
 
   // Determine if we're in a break glass error state (Story 2.6 AC#2)
   const isBreakGlass = isRevealed && revealType === "break_glass";
@@ -286,6 +284,68 @@ function CommandCenterInner({
   // Show error fallback while in break glass AND not yet dismissed
   const showErrorFallback = isBreakGlass && !errorDismissed;
 
+  // Whether the user has submitted their purchase description
+  const hasMessages = messages.length > 0;
+
+  // Purchase input form — shown when Guardian is active but no message sent yet
+  const purchaseInputForm =
+    isActive && !hasMessages ? (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (purchaseInput.trim()) {
+            sendMessage({ text: purchaseInput.trim() });
+            setPurchaseInput("");
+          }
+        }}
+        style={{
+          display: "flex",
+          gap: "0.5rem",
+          padding: "0.75rem",
+        }}
+      >
+        <input
+          aria-label="Describe your purchase"
+          // biome-ignore lint/a11y/noAutofocus: Guardian conversation auto-focuses input for immediate purchase entry
+          autoFocus
+          onChange={(e) => setPurchaseInput(e.target.value)}
+          placeholder="What are you buying? e.g. Bluetooth speaker - $79"
+          style={{
+            flex: 1,
+            padding: "0.5rem 0.75rem",
+            borderRadius: "0.5rem",
+            border: "1px solid var(--card-border)",
+            background: "var(--card-bg, hsl(var(--muted)))",
+            color: "inherit",
+            fontSize: "0.875rem",
+            fontFamily: "var(--font-conversation)",
+            outline: "none",
+          }}
+          value={purchaseInput}
+        />
+        <button
+          disabled={!purchaseInput.trim()}
+          style={{
+            padding: "0.5rem 1rem",
+            borderRadius: "0.5rem",
+            background: purchaseInput.trim()
+              ? "hsl(var(--primary))"
+              : "hsl(var(--muted))",
+            color: purchaseInput.trim()
+              ? "hsl(var(--primary-foreground))"
+              : "hsl(var(--muted-foreground))",
+            border: "none",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+            cursor: purchaseInput.trim() ? "pointer" : "default",
+          }}
+          type="submit"
+        >
+          Send
+        </button>
+      </form>
+    ) : null;
+
   // Content for the conversation area: show error fallback during break glass,
   // otherwise delegate to MessageRenderer for text + tool parts (Story 4.4).
   // GUARDIAN_ERROR auto-reveals the card (Default-to-Unlock principle per NFR-R1).
@@ -295,14 +355,17 @@ function CommandCenterInner({
       onManualUnlock={() => setErrorDismissed(true)}
     />
   ) : (
-    <MessageRenderer
-      guardianContent={guardianContent}
-      interactionId={interactionIdRef.current}
-      isStreaming={isStreaming}
-      messages={messages}
-      onRevealApproved={revealApproved}
-      onWait={relock}
-    />
+    <>
+      {purchaseInputForm}
+      <MessageRenderer
+        guardianContent={guardianContent}
+        interactionId={interactionIdRef.current}
+        isStreaming={isStreaming}
+        messages={messages}
+        onRevealApproved={revealApproved}
+        onWait={relock}
+      />
+    </>
   );
 
   return (

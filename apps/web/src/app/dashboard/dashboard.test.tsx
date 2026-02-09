@@ -26,6 +26,24 @@ const mocks = vi.hoisted(() => ({
     error: null as Error | null,
     refetch: vi.fn(),
   },
+  cardResult: {
+    data: undefined as
+      | {
+          id: string;
+          userId: string;
+          lastFour: string;
+          nickname: string | null;
+          status: string;
+          lockedAt: Date | null;
+          unlockedAt: Date | null;
+          createdAt: Date;
+          updatedAt: Date;
+        }
+      | undefined,
+    isLoading: false,
+    error: null as Error | null,
+    refetch: vi.fn(),
+  },
   savingsResult: {
     data: undefined as
       | {
@@ -60,11 +78,14 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
     ...actual,
     useQuery: vi.fn(() => {
       const idx = mocks.useQueryCallIndex++;
-      // First: dashboard.summary, second: savings.getSummary, third: dashboard.referralStatus
+      // Order: dashboard.summary, dashboard.getCard, savings.getSummary, dashboard.referralStatus
       if (idx === 0) {
         return mocks.dashboardResult;
       }
       if (idx === 1) {
+        return mocks.cardResult;
+      }
+      if (idx === 2) {
         return mocks.savingsResult;
       }
       return mocks.referralResult;
@@ -79,6 +100,12 @@ vi.mock("@/utils/trpc", () => ({
       summary: {
         queryOptions: vi.fn(() => ({
           queryKey: ["dashboard", "summary"],
+          queryFn: vi.fn(),
+        })),
+      },
+      getCard: {
+        queryOptions: vi.fn(() => ({
+          queryKey: ["dashboard", "getCard"],
           queryFn: vi.fn(),
         })),
       },
@@ -105,8 +132,31 @@ vi.mock("@/lib/format", () => ({
   formatRelativeTime: vi.fn(() => "1 hour ago"),
 }));
 
+// --- Mock CommandCenter (tested separately in its own 21-test suite) ---
+vi.mock("@/components/guardian/command-center", () => ({
+  CommandCenter: ({
+    feedContent,
+  }: {
+    feedContent?: React.ReactNode;
+    card: unknown;
+    cardId?: string;
+  }) => <div data-testid="command-center">{feedContent}</div>,
+}));
+
 // Import after mocks are set up (vi.mock is hoisted)
 import Dashboard from "./dashboard";
+
+const DEFAULT_CARD = {
+  id: "card-1",
+  userId: "user-1",
+  lastFour: "4242",
+  nickname: null,
+  status: "active",
+  lockedAt: null,
+  unlockedAt: null,
+  createdAt: new Date("2026-01-01"),
+  updatedAt: new Date("2026-01-01"),
+};
 
 function renderDashboard() {
   const queryClient = new QueryClient({
@@ -129,6 +179,12 @@ describe("Dashboard", () => {
       error: null,
       refetch: vi.fn(),
     };
+    mocks.cardResult = {
+      data: DEFAULT_CARD,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    };
     mocks.savingsResult = {
       data: undefined,
       isLoading: false,
@@ -145,6 +201,14 @@ describe("Dashboard", () => {
 
   it("skeleton loading state renders", () => {
     mocks.dashboardResult.isLoading = true;
+
+    renderDashboard();
+
+    expect(screen.getByTestId("dashboard-skeleton")).toBeInTheDocument();
+  });
+
+  it("skeleton renders when card is loading", () => {
+    mocks.cardResult.isLoading = true;
 
     renderDashboard();
 
@@ -261,7 +325,7 @@ describe("Dashboard", () => {
     expect(screen.queryByTestId("savings-counter")).not.toBeInTheDocument();
   });
 
-  it("shows onboarding prompt for new user with no interactions", () => {
+  it("renders feed content inside CommandCenter", () => {
     mocks.dashboardResult.data = {
       interactionCount: 0,
       totalSavedCents: 0,
@@ -271,31 +335,8 @@ describe("Dashboard", () => {
 
     renderDashboard();
 
-    const prompt = screen.getByTestId("onboarding-prompt");
-    expect(prompt).toBeInTheDocument();
-    expect(prompt).toHaveTextContent("Tap to meet your Guardian");
-  });
-
-  it("hides onboarding prompt when user has interactions", () => {
-    mocks.dashboardResult.data = {
-      interactionCount: 3,
-      totalSavedCents: 1500,
-      acceptanceRate: 66.7,
-      recentInteractions: [
-        {
-          id: "int-1",
-          tier: "analyst",
-          outcome: "accepted",
-          reasoningSummary: null,
-          createdAt: new Date("2026-02-08"),
-          cardLastFour: "1234",
-        },
-      ],
-    };
-
-    renderDashboard();
-
-    expect(screen.queryByTestId("onboarding-prompt")).not.toBeInTheDocument();
+    expect(screen.getByTestId("command-center")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-feed")).toBeInTheDocument();
   });
 
   it("renders empty interactions with HistoryEmptyState component", () => {

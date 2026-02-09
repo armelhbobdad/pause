@@ -5,6 +5,7 @@ import { protectedProcedure, router } from "../index";
 
 const { card, interaction, savings } = schema;
 
+const DEFAULT_LAST_FOUR = "4242";
 const HIGH_RISK_SCORE = 70;
 const RECENT_LIMIT = 10;
 const DEFAULT_THRESHOLD = 3;
@@ -21,6 +22,36 @@ function getReferralThreshold(): number {
 }
 
 export const dashboardRouter = router({
+  /** Fetch user's active card, auto-provisioning one if none exists. */
+  getCard: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+
+    const [existing] = await db
+      .select()
+      .from(card)
+      .where(and(eq(card.userId, userId), eq(card.status, "active")))
+      .limit(1);
+
+    if (existing) {
+      return existing;
+    }
+
+    // Auto-provision a card for new users (hackathon demo convenience)
+    const newCard = {
+      id: crypto.randomUUID(),
+      userId,
+      lastFour: DEFAULT_LAST_FOUR,
+      nickname: null,
+      status: "active" as const,
+      lockedAt: null,
+      unlockedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(card).values(newCard);
+    return newCard;
+  }),
+
   // NOTE: 4 sequential queries for readability. Consider combining with CTEs
   // if dashboard LCP exceeds NFR-P5 (1.5s) target under real load.
   summary: protectedProcedure.query(async ({ ctx }) => {

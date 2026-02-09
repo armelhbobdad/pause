@@ -30,14 +30,16 @@ DEMO_MODE=true
 ```
 
 This activates:
-- **"DEMO" badge** — small pill in the top-right corner of every page
+- **"DEMO" badge** — small pill in the bottom-left corner of every page
 - **Deterministic AI** — `temperature: 0` and `seed: 42` for reproducible outputs
 - **Mock coupon provider** — returns realistic coupons without a real API
 - **Seed script safety gate** — allows running `db:seed:rookie` and `db:seed:pro`
 
 ## 2. Seed the Database
 
-Two seed profiles are available. Each creates a demo user **Alex** with card ending in **4242**.
+> **Deployed app (Vercel):** All database branches are **pre-seeded with Pro data** — you can skip this section and go straight to [Step 3](#3-start-the-app). The demo user Alex is already set up with full history, savings, and a trained Skillbook.
+
+For **local development**, two seed profiles are available. Each creates a demo user **Alex** with card ending in **4242**.
 
 ### Option A: Rookie (Fresh User)
 
@@ -83,7 +85,7 @@ Running either seed command automatically **cleans existing demo data first** �
 bun dev
 ```
 
-Open `http://localhost:3001`. You should see the **"DEMO"** badge in the top-right corner.
+Open `http://localhost:3001`. You should see the **"DEMO"** badge in the bottom-left corner.
 
 ## 4. Create an Account & Sign In
 
@@ -93,8 +95,8 @@ Open `http://localhost:3001`. You should see the **"DEMO"** badge in the top-rig
    - Password: *(set during account creation — seeds don't set a password, so create an account first, then re-seed)*
 
 **Recommended flow for judges:**
-1. Create a fresh account with your own email at `/login`
-2. Then run `db:seed:rookie` or `db:seed:pro` to populate demo data for that user
+1. **Deployed app:** Create an account at `/login` — the Pro seed data (Alex + history) is already in the database
+2. **Local:** Create a fresh account, then run `db:seed:rookie` or `db:seed:pro` to populate demo data
 3. Or simply use the app as-is — every new user starts with an empty Skillbook
 
 ## 5. Floating AI Chat (Try This First!)
