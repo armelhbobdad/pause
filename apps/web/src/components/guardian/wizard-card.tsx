@@ -17,12 +17,15 @@ export function WizardCard({
       aria-live="polite"
       style={{
         display: "block",
-        backgroundColor: "var(--therapist-amber-subtle)",
+        borderLeft: "4px solid var(--therapist-amber)",
+        backgroundColor: "oklch(0.18 0.04 50 / 65%)",
         borderRadius: "0.5rem",
-        padding: "0.75rem 1rem",
+        padding: "1rem 1.125rem",
         maxHeight: "350px",
         overflowY: "auto",
         animation: "savings-ticket-enter 800ms var(--ease-out-expo) both",
+        boxShadow:
+          "0 1px 3px oklch(0 0 0 / 0.2), inset 0 1px 0 oklch(1 0 0 / 0.04)",
       }}
     >
       <div

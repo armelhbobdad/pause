@@ -83,12 +83,14 @@ export function ReflectionPrompt({
       style={{
         display: "block",
         borderLeft: "4px solid var(--therapist-amber)",
-        backgroundColor: "var(--therapist-amber-subtle)",
+        backgroundColor: "oklch(0.18 0.04 50 / 65%)",
         borderRadius: "0.5rem",
-        padding: "0.75rem 1rem",
+        padding: "1rem 1.125rem",
         maxHeight: "350px",
         overflowY: "auto",
         animation: "savings-ticket-enter 800ms var(--ease-out-expo) both",
+        boxShadow:
+          "0 1px 3px oklch(0 0 0 / 0.2), inset 0 1px 0 oklch(1 0 0 / 0.04)",
       }}
     >
       <div
@@ -96,7 +98,9 @@ export function ReflectionPrompt({
           fontFamily: "var(--font-conversation)",
           fontSize: "1rem",
           color: "var(--therapist-amber)",
-          lineHeight: 1.5,
+          lineHeight: 1.6,
+          fontWeight: 500,
+          fontStyle: "italic",
         }}
       >
         {output.reflectionPrompt}
@@ -104,11 +108,13 @@ export function ReflectionPrompt({
 
       <div
         style={{
-          fontFamily: "var(--font-conversation)",
-          fontSize: "0.75rem",
+          fontFamily: "var(--font-data)",
+          fontSize: "0.6875rem",
           color: "var(--therapist-amber)",
-          marginTop: "0.375rem",
-          opacity: 0.6,
+          marginTop: "0.5rem",
+          opacity: 0.5,
+          letterSpacing: "0.03em",
+          textTransform: "uppercase",
         }}
       >
         {output.strategyName}

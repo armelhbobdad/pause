@@ -2,6 +2,13 @@
 
 > Step-by-step instructions for replicating every feature in Pause.
 
+> **IMPORTANT — Gemini Rate Limits:**
+> Pause uses **Gemini 2.5 Flash** for all AI features (Guardian, Knowledge Chat, ACE Learning). On the free tier, Google enforces a hard limit of **20 requests per minute** per model. Each Guardian interaction triggers multiple API calls (risk assessment + streaming response + Skillbook learning), so you can realistically trigger only **~5 full Guardian flows per minute** before hitting the quota.
+>
+> **If the Guardian shows "Guardian unavailable" with a Manual Unlock fallback**, wait ~45 seconds and try again — the quota resets on a rolling window. The deployed app on Vercel shares the same API key across all users, so concurrent judges will deplete the quota faster.
+>
+> **Tip:** Space your Guardian interactions ~15-20 seconds apart for the most reliable experience. The Floating AI Chat and Dashboard features (profile switching, guided tour, history, ghost cards) do **not** count against this limit and work without any rate restrictions.
+
 ## Table of Contents
 
 - [1. Enable Demo Mode](#1-enable-demo-mode)

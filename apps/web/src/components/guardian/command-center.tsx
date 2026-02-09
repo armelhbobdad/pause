@@ -399,6 +399,16 @@ function CommandCenterInner({
             </NativeDialogDescription>
           </NativeDialogHeader>
 
+          {/* Subtle divider between header and content */}
+          <div
+            style={{
+              height: "1px",
+              background:
+                "linear-gradient(90deg, transparent, oklch(1 0 0 / 0.1) 20%, oklch(1 0 0 / 0.1) 80%, transparent)",
+              marginBottom: "0.75rem",
+            }}
+          />
+
           {/* Purchase input form — shown when active but no messages */}
           {isActive && !hasMessages && (
             <form
@@ -458,9 +468,17 @@ function CommandCenterInner({
           {hasMessages && (
             <div
               style={{
+                position: "relative",
                 maxHeight: "50vh",
                 overflow: "auto",
-                marginTop: "0.5rem",
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                background: "oklch(0.08 0.005 250 / 40%)",
+                border: "1px solid oklch(1 0 0 / 0.05)",
+                maskImage:
+                  "linear-gradient(to bottom, transparent 0%, black 3%, black 92%, transparent 100%)",
+                WebkitMaskImage:
+                  "linear-gradient(to bottom, transparent 0%, black 3%, black 92%, transparent 100%)",
               }}
             >
               <MessageRenderer
@@ -477,6 +495,33 @@ function CommandCenterInner({
                   setDialogOpen(false);
                 }}
               />
+
+              {/* Streaming indicator — pulsing dots while AI is thinking */}
+              {isStreaming && (
+                <output
+                  aria-label="Guardian is thinking"
+                  style={{
+                    display: "flex",
+                    gap: "0.375rem",
+                    padding: "0.5rem 0",
+                    alignItems: "center",
+                  }}
+                >
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      style={{
+                        display: "block",
+                        width: "0.375rem",
+                        height: "0.375rem",
+                        borderRadius: "50%",
+                        background: "var(--accent-glow, oklch(0.75 0.15 250))",
+                        animation: `thinking-pulse 1.4s ease-in-out ${i * 0.16}s infinite`,
+                      }}
+                    />
+                  ))}
+                </output>
+              )}
             </div>
           )}
         </NativeDialogContent>
