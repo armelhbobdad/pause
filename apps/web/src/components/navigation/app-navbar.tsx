@@ -22,68 +22,77 @@ export function AppNavbar() {
 
   return (
     <nav
-      className="flex items-center justify-between border-b px-4 py-2"
+      className="flex items-center justify-between px-5 py-2.5"
       data-navbar
       style={{
-        background: "oklch(0.12 0.005 250 / 90%)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
+        background: "oklch(0.1 0.005 250 / 60%)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        borderBottom: "1px solid oklch(1 0 0 / 0.06)",
       }}
     >
-      <div className="flex items-center gap-6">
-        <Link className="flex items-center gap-2 pl-1" href="/">
-          <Image
-            alt="Pause"
-            className="rounded-md"
-            height={28}
-            src="/logo.png"
-            width={28}
-          />
-          <span
-            className="font-bold text-lg tracking-tight"
-            style={{ color: "var(--text-hero)" }}
-          >
-            pause
-          </span>
-        </Link>
-        <ul className="flex gap-1">
-          {navItems.map((item, index) => (
-            <li className="relative" key={item.href}>
-              <Link
-                className="relative z-10 block px-4 py-2 font-medium text-sm transition-colors"
-                href={item.href}
-                style={{
-                  color:
-                    activeIndex === index
-                      ? "var(--primary-foreground)"
-                      : "var(--muted-foreground)",
-                }}
+      {/* Logo */}
+      <Link className="flex items-center gap-2.5" href="/">
+        <Image
+          alt="Pause"
+          className="rounded-lg"
+          height={26}
+          src="/logo.png"
+          width={26}
+        />
+        <span
+          className="font-semibold text-[15px] tracking-[-0.01em]"
+          style={{ color: "oklch(0.95 0.01 250)" }}
+        >
+          Pause
+        </span>
+      </Link>
+
+      {/* Navigation */}
+      <div className="flex items-center gap-1">
+        {navItems.map((item, index) => {
+          const isActive = activeIndex === index;
+          return (
+            <Link
+              className="relative px-3 py-1.5 font-medium text-[13px] transition-colors"
+              href={item.href}
+              key={item.href}
+              style={{
+                color: isActive
+                  ? "oklch(0.95 0.01 250)"
+                  : "oklch(0.55 0.02 250)",
+              }}
+            >
+              <motion.span
+                whileHover={
+                  shouldReduceMotion ? {} : { color: "oklch(0.85 0.02 250)" }
+                }
               >
-                <motion.span
-                  whileHover={shouldReduceMotion ? {} : { scale: 1.05 }}
-                  whileTap={shouldReduceMotion ? {} : { scale: 0.95 }}
-                >
-                  {item.label}
-                </motion.span>
-              </Link>
-              {activeIndex === index && (
+                {item.label}
+              </motion.span>
+              {isActive && (
                 <motion.div
-                  className="absolute inset-0 rounded-lg bg-accent"
-                  layoutId="navbar-indicator"
+                  className="absolute right-3 bottom-0 left-3 h-[1.5px]"
+                  layoutId="nav-underline"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, oklch(0.75 0.15 250), oklch(0.65 0.12 280))",
+                    borderRadius: "1px",
+                  }}
                   transition={{
                     type: "spring",
-                    stiffness: 380,
-                    damping: 30,
+                    stiffness: 400,
+                    damping: 32,
                   }}
                 />
               )}
-            </li>
-          ))}
-        </ul>
+            </Link>
+          );
+        })}
       </div>
-      <div className="flex items-center gap-2">
-        <UserMenu />
-      </div>
+
+      {/* User menu */}
+      <UserMenu />
     </nav>
   );
 }

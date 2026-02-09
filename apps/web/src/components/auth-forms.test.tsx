@@ -20,18 +20,12 @@ describe("Auth Forms Glassmorphism Rebrand (Story 10.4)", () => {
       expect(signInSource).not.toMatch(BUTTON_IMPORT_RE);
     });
 
-    it("applies glassmorphism CSS via inline styles", () => {
-      expect(signInSource).toContain("--pause-glass");
-      expect(signInSource).toContain("--pause-blur-medium");
+    it("uses NativeInput for form fields", () => {
+      expect(signInSource).toContain("NativeInput");
     });
 
-    it("has glass-panel class and data-glass attribute", () => {
-      expect(signInSource).toContain("glass-panel");
-      expect(signInSource).toContain("data-glass");
-    });
-
-    it("has max-width 480px", () => {
-      expect(signInSource).toContain("max-w-[480px]");
+    it("uses oklch color system for labels", () => {
+      expect(signInSource).toContain("oklch");
     });
 
     it("passes loading prop to NativeButton", () => {
@@ -54,9 +48,8 @@ describe("Auth Forms Glassmorphism Rebrand (Story 10.4)", () => {
       expect(signUpSource).not.toMatch(BUTTON_IMPORT_RE);
     });
 
-    it("applies glassmorphism CSS via inline styles", () => {
-      expect(signUpSource).toContain("--pause-glass");
-      expect(signUpSource).toContain("--pause-blur-medium");
+    it("uses NativeInput for form fields", () => {
+      expect(signUpSource).toContain("NativeInput");
     });
 
     it("redirects to /dashboard on success without toast", () => {

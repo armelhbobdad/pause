@@ -15,6 +15,13 @@ import { GuardianErrorBoundary } from "@/components/guardian/guardian-error-boun
 import { GuardianErrorFallback } from "@/components/guardian/guardian-error-fallback";
 import { MessageRenderer } from "@/components/guardian/message-renderer";
 import { RelockTimer } from "@/components/guardian/relock-timer";
+import {
+  NativeDialog,
+  NativeDialogContent,
+  NativeDialogDescription,
+  NativeDialogHeader,
+  NativeDialogTitle,
+} from "@/components/uitripled/native-dialog-shadcnui";
 import { useGuardianState } from "@/hooks/use-guardian-state";
 import { useStreamTimeout } from "@/hooks/use-stream-timeout";
 
@@ -125,6 +132,9 @@ function CommandCenterInner({
     relock,
   } = useGuardianState({ onTimeout, timeoutMs: 120_000 });
 
+  // --- Dialog state: Guardian interaction happens inside NativeDialog ---
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   // --- Auto-approve detection (Story 3.5) ---
   // SDK v6 doesn't expose response headers via onFinish. We intercept them
   // using a custom fetch wrapper on the transport, then dispatch the reveal
@@ -157,6 +167,7 @@ function CommandCenterInner({
     onFinish: () => {
       if (breakGlassRef.current) {
         guardianError();
+        setDialogOpen(false);
         toast.warning("Guardian unavailable. Manual unlock enabled.", {
           duration: 4000,
         });
@@ -172,6 +183,7 @@ function CommandCenterInner({
           toast.success("Auto-approved", { duration: 2000 });
         }
         revealApproved();
+        setDialogOpen(false);
         autoApprovedRef.current = false;
         degradedRef.current = false;
         return;
@@ -182,6 +194,7 @@ function CommandCenterInner({
       // Check refs set by the fetch wrapper before falling through to generic error.
       if (breakGlassRef.current) {
         guardianError();
+        setDialogOpen(false);
         toast.warning("Guardian unavailable. Manual unlock enabled.", {
           duration: 4000,
         });
@@ -199,6 +212,7 @@ function CommandCenterInner({
           toast.success("Auto-approved", { duration: 2000 });
         }
         revealApproved();
+        setDialogOpen(false);
         autoApprovedRef.current = false;
         degradedRef.current = false;
         return;
@@ -207,6 +221,7 @@ function CommandCenterInner({
       breakGlassRef.current = false;
       degradedRef.current = false;
       guardianError();
+      setDialogOpen(false);
     },
   });
 
@@ -220,10 +235,6 @@ function CommandCenterInner({
   }
 
   // Stream interruption monitoring (Story 2.6 AC#3, wired to useChat).
-  // NOTE: isInterrupted is tracked for UI feedback (e.g., "Connection lost" indicator)
-  // but does NOT trigger break-glass directly. Break-glass is handled exclusively by
-  // the onError callback. This avoids a race condition where the 3s stream timeout
-  // fires during initial API response latency, before onFinish/onError can run.
   const { isInterrupted: _isInterrupted } = useStreamTimeout({
     isStreaming,
     lastActivityTimestamp: lastActivityRef.current,
@@ -233,8 +244,6 @@ function CommandCenterInner({
   const isBreakGlass = isRevealed && revealType === "break_glass";
 
   // Track whether the break glass fallback has been dismissed by the user.
-  // "Manual Unlock" acknowledges the emergency unlock (card stays revealed).
-  // "Dismiss" calls relock() to return to idle.
   const [errorDismissed, setErrorDismissed] = useState(false);
 
   // Reset dismissal flag when leaving break glass state (e.g., after relock)
@@ -243,6 +252,13 @@ function CommandCenterInner({
       setErrorDismissed(false);
     }
   }, [isBreakGlass]);
+
+  // Close dialog when card is revealed or relocked
+  useEffect(() => {
+    if (isRevealed || state === "idle") {
+      setDialogOpen(false);
+    }
+  }, [isRevealed, state]);
 
   // Abandoned tracking: send beacon on beforeunload when active (Story 9.5)
   useEffect(() => {
@@ -287,85 +303,19 @@ function CommandCenterInner({
   // Whether the user has submitted their purchase description
   const hasMessages = messages.length > 0;
 
-  // Purchase input form — shown when Guardian is active but no message sent yet
-  const purchaseInputForm =
-    isActive && !hasMessages ? (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (purchaseInput.trim()) {
-            sendMessage({ text: purchaseInput.trim() });
-            setPurchaseInput("");
-          }
-        }}
-        style={{
-          display: "flex",
-          gap: "0.5rem",
-          padding: "0.75rem",
-        }}
-      >
-        <input
-          aria-label="Describe your purchase"
-          autoFocus
-          onChange={(e) => setPurchaseInput(e.target.value)}
-          placeholder="What are you buying? e.g. Bluetooth speaker - $79"
-          style={{
-            flex: 1,
-            padding: "0.5rem 0.75rem",
-            borderRadius: "0.5rem",
-            border: "1px solid var(--card-border)",
-            background: "var(--card-bg, hsl(var(--muted)))",
-            color: "inherit",
-            fontSize: "0.875rem",
-            fontFamily: "var(--font-conversation)",
-            outline: "none",
-          }}
-          value={purchaseInput}
-        />
-        <button
-          disabled={!purchaseInput.trim()}
-          style={{
-            padding: "0.5rem 1rem",
-            borderRadius: "0.5rem",
-            background: purchaseInput.trim()
-              ? "hsl(var(--primary))"
-              : "hsl(var(--muted))",
-            color: purchaseInput.trim()
-              ? "hsl(var(--primary-foreground))"
-              : "hsl(var(--muted-foreground))",
-            border: "none",
-            fontSize: "0.875rem",
-            fontWeight: 500,
-            cursor: purchaseInput.trim() ? "pointer" : "default",
-          }}
-          type="submit"
-        >
-          Send
-        </button>
-      </form>
-    ) : null;
+  // Handle card click: open dialog and start Guardian flow
+  const handleCardActivate = () => {
+    setDialogOpen(true);
+    requestUnlock();
+  };
 
-  // Content for the conversation area: show error fallback during break glass,
-  // otherwise delegate to MessageRenderer for text + tool parts (Story 4.4).
-  // GUARDIAN_ERROR auto-reveals the card (Default-to-Unlock principle per NFR-R1).
-  const conversationContent = showErrorFallback ? (
-    <GuardianErrorFallback
-      onDismiss={relock}
-      onManualUnlock={() => setErrorDismissed(true)}
-    />
-  ) : (
-    <>
-      {purchaseInputForm}
-      <MessageRenderer
-        guardianContent={guardianContent}
-        interactionId={interactionIdRef.current}
-        isStreaming={isStreaming}
-        messages={messages}
-        onRevealApproved={revealApproved}
-        onWait={relock}
-      />
-    </>
-  );
+  // Handle dialog close: if still active, relock
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!open && isActive) {
+      relock();
+    }
+    setDialogOpen(open);
+  };
 
   return (
     <div
@@ -393,7 +343,7 @@ function CommandCenterInner({
             isActive={isActive}
             isRevealed={isRevealed}
             onCountdownExpire={onCountdownExpire}
-            onUnlockRequest={requestUnlock}
+            onUnlockRequest={handleCardActivate}
             revealType={revealType}
             showCountdown={showCountdown && isRevealed}
           />
@@ -406,21 +356,23 @@ function CommandCenterInner({
           />
         </div>
 
-        {/* Guardian Conversation - expands below card when active or showing error fallback */}
-        <GuardianConversation
-          isActive={isActive || showErrorFallback}
-          onCollapseComplete={onCollapseComplete}
-          onExpansionComplete={onExpansionComplete}
-          tier={tier}
-        >
-          {conversationContent}
-        </GuardianConversation>
+        {/* Guardian Conversation - hidden when using dialog mode, shows for error fallback */}
+        {showErrorFallback && (
+          <GuardianConversation
+            isActive={true}
+            onCollapseComplete={onCollapseComplete}
+            onExpansionComplete={onExpansionComplete}
+            tier={tier}
+          >
+            <GuardianErrorFallback
+              onDismiss={relock}
+              onManualUnlock={() => setErrorDismissed(true)}
+            />
+          </GuardianConversation>
+        )}
       </div>
 
-      {/* Feed section (~60vh) — inert when Guardian is active (UX-90)
-          Opacity dims to 0.5 during active state as visual reinforcement of
-          inert status, guiding attention toward the Guardian conversation area.
-          Not in UX spec — polish addition; remove if UX team objects. */}
+      {/* Feed section (~60vh) — inert when Guardian is active (UX-90) */}
       <section
         inert={isActive || undefined}
         style={{
@@ -432,6 +384,103 @@ function CommandCenterInner({
       >
         {feedContent}
       </section>
+
+      {/* Guardian Dialog — glassmorphism modal for purchase interaction */}
+      <NativeDialog onOpenChange={handleDialogOpenChange} open={dialogOpen}>
+        <NativeDialogContent>
+          <NativeDialogHeader>
+            <NativeDialogTitle>
+              {hasMessages ? "Guardian Review" : "What are you buying?"}
+            </NativeDialogTitle>
+            <NativeDialogDescription>
+              {hasMessages
+                ? "Your AI Guardian is reviewing this purchase."
+                : "Describe your purchase and the Guardian will analyze it."}
+            </NativeDialogDescription>
+          </NativeDialogHeader>
+
+          {/* Purchase input form — shown when active but no messages */}
+          {isActive && !hasMessages && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (purchaseInput.trim()) {
+                  onExpansionComplete();
+                  sendMessage({ text: purchaseInput.trim() });
+                  setPurchaseInput("");
+                }
+              }}
+              style={{ display: "flex", gap: "0.5rem" }}
+            >
+              <input
+                aria-label="Describe your purchase"
+                autoFocus
+                onChange={(e) => setPurchaseInput(e.target.value)}
+                placeholder="e.g. Bluetooth speaker — $79"
+                style={{
+                  flex: 1,
+                  padding: "0.625rem 0.875rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid oklch(1 0 0 / 0.1)",
+                  background: "oklch(0.1 0.005 250 / 60%)",
+                  color: "inherit",
+                  fontSize: "0.875rem",
+                  fontFamily: "var(--font-conversation)",
+                  outline: "none",
+                }}
+                value={purchaseInput}
+              />
+              <button
+                disabled={!purchaseInput.trim()}
+                style={{
+                  padding: "0.625rem 1.25rem",
+                  borderRadius: "0.75rem",
+                  background: purchaseInput.trim()
+                    ? "linear-gradient(135deg, oklch(0.55 0.18 250), oklch(0.45 0.2 270))"
+                    : "oklch(0.2 0.01 250)",
+                  color: purchaseInput.trim()
+                    ? "oklch(0.98 0 0)"
+                    : "oklch(0.5 0.02 250)",
+                  border: "none",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  cursor: purchaseInput.trim() ? "pointer" : "default",
+                  transition: "all 200ms ease",
+                }}
+                type="submit"
+              >
+                Send
+              </button>
+            </form>
+          )}
+
+          {/* Message stream — shows Guardian conversation */}
+          {hasMessages && (
+            <div
+              style={{
+                maxHeight: "50vh",
+                overflow: "auto",
+                marginTop: "0.5rem",
+              }}
+            >
+              <MessageRenderer
+                guardianContent={guardianContent}
+                interactionId={interactionIdRef.current}
+                isStreaming={isStreaming}
+                messages={messages}
+                onRevealApproved={() => {
+                  revealApproved();
+                  setDialogOpen(false);
+                }}
+                onWait={() => {
+                  relock();
+                  setDialogOpen(false);
+                }}
+              />
+            </div>
+          )}
+        </NativeDialogContent>
+      </NativeDialog>
     </div>
   );
 }

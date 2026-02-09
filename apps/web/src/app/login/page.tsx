@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -13,6 +14,7 @@ const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
 export default function LoginPage() {
   const router = useRouter();
+  const shouldReduceMotion = useReducedMotion();
   const [showSignIn, setShowSignIn] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoError, setDemoError] = useState("");
@@ -37,93 +39,143 @@ export default function LoginPage() {
       className="flex min-h-full flex-col items-center justify-center px-4"
       style={{
         background:
-          "radial-gradient(ellipse at 50% 0%, oklch(0.2 0.04 250 / 40%), transparent 70%)",
+          "radial-gradient(ellipse at 50% 0%, oklch(0.18 0.04 250 / 50%), transparent 70%)",
       }}
     >
-      <div className="mb-6 flex flex-col items-center gap-2">
-        <div className="flex flex-col items-center gap-3">
+      <motion.div
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-[440px]"
+        initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 16 }}
+        transition={{
+          duration: 0.45,
+          ease: shouldReduceMotion ? "linear" : [0.16, 1, 0.3, 1],
+        }}
+      >
+        {/* Logo & tagline */}
+        <div className="mb-8 flex flex-col items-center gap-3">
           <Image
             alt="Pause"
-            className="rounded-2xl drop-shadow-[0_0_24px_rgba(56,136,255,0.4)]"
-            height={80}
+            className="rounded-2xl"
+            height={64}
             src="/logo.png"
-            width={80}
+            style={{
+              filter: "drop-shadow(0 0 20px oklch(0.6 0.15 250 / 0.3))",
+            }}
+            width={64}
           />
           <span
-            className="font-bold text-2xl tracking-tight"
-            style={{ color: "var(--text-hero)" }}
+            className="font-semibold text-xl tracking-[-0.01em]"
+            style={{ color: "oklch(0.95 0.01 250)" }}
           >
-            pause
+            Pause
           </span>
-        </div>
-        <div
-          className="flex items-center gap-1.5 text-sm"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          <span>Your AI Guardian</span>
-          <NativeFlipText
-            className="font-medium"
-            duration={2500}
-            words={["is waiting", "learns fast", "saves more", "knows you"]}
-          />
-        </div>
-      </div>
-
-      {IS_DEMO && (
-        <div className="mb-4 w-full max-w-[480px]">
-          <button
-            className="w-full rounded-xl px-6 py-3.5 font-semibold text-base text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
-            disabled={demoLoading}
-            onClick={handleDemoLogin}
-            style={{
-              background:
-                "linear-gradient(135deg, oklch(0.55 0.2 260), oklch(0.45 0.25 280))",
-              boxShadow:
-                "0 4px 20px oklch(0.4 0.2 260 / 0.5), inset 0 1px 0 oklch(1 0 0 / 0.15)",
-            }}
-            type="button"
+          <div
+            className="flex items-center gap-1.5 text-[13px]"
+            style={{ color: "oklch(0.55 0.02 250)" }}
           >
-            {demoLoading ? "Signing in..." : "Try Demo as Alex"}
-          </button>
-          {demoError && (
-            <p
-              className="mt-2 text-center text-sm"
-              style={{ color: "hsl(var(--destructive))" }}
+            <span>Your AI Guardian</span>
+            <NativeFlipText
+              className="font-medium"
+              duration={2500}
+              words={["is waiting", "learns fast", "saves more", "knows you"]}
+            />
+          </div>
+        </div>
+
+        {/* Glass card wrapper */}
+        <div
+          className="overflow-hidden rounded-2xl border p-6 sm:p-8"
+          style={{
+            background: "oklch(0.14 0.01 250 / 70%)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            borderColor: "oklch(1 0 0 / 0.08)",
+            boxShadow:
+              "0 8px 40px oklch(0 0 0 / 0.4), 0 0 80px oklch(0.75 0.15 250 / 0.04)",
+          }}
+        >
+          {/* Header badge */}
+          <div className="mb-6 text-center">
+            <span
+              className="inline-flex rounded-full border px-3 py-1 font-medium text-[11px] uppercase tracking-[0.2em]"
+              style={{
+                borderColor: "oklch(1 0 0 / 0.08)",
+                color: "oklch(0.55 0.02 250)",
+                background: "oklch(1 0 0 / 0.03)",
+              }}
             >
-              {demoError}
-            </p>
+              {showSignIn ? "Sign In" : "Get Started"}
+            </span>
+          </div>
+
+          {/* Demo button */}
+          {IS_DEMO && (
+            <>
+              <button
+                className="w-full rounded-xl px-5 py-3 font-semibold text-[14px] text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+                disabled={demoLoading}
+                onClick={handleDemoLogin}
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.5 0.18 250), oklch(0.4 0.22 270))",
+                  boxShadow:
+                    "0 4px 20px oklch(0.4 0.18 250 / 0.4), inset 0 1px 0 oklch(1 0 0 / 0.1)",
+                }}
+                type="button"
+              >
+                {demoLoading ? "Signing in..." : "Try Demo as Alex"}
+              </button>
+              {demoError && (
+                <p
+                  className="mt-2 text-center text-[12px]"
+                  style={{ color: "hsl(var(--destructive))" }}
+                >
+                  {demoError}
+                </p>
+              )}
+              <p
+                className="mt-2 text-center text-[11px]"
+                style={{ color: "oklch(0.45 0.02 250)" }}
+              >
+                Pre-loaded with history, savings, and a trained AI
+              </p>
+
+              {/* Divider */}
+              <div className="my-6 flex items-center gap-3">
+                <div
+                  className="h-px flex-1"
+                  style={{ background: "oklch(1 0 0 / 0.08)" }}
+                />
+                <span
+                  className="text-[11px] uppercase tracking-[0.2em]"
+                  style={{ color: "oklch(0.4 0.02 250)" }}
+                >
+                  or
+                </span>
+                <div
+                  className="h-px flex-1"
+                  style={{ background: "oklch(1 0 0 / 0.08)" }}
+                />
+              </div>
+            </>
           )}
-          <p
-            className="mt-2 text-center text-xs"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Pre-loaded with history, savings, and a trained AI
-          </p>
-        </div>
-      )}
 
-      {IS_DEMO && (
-        <div
-          className="mb-4 flex w-full max-w-[480px] items-center gap-3"
-          style={{ color: "var(--text-secondary)" }}
+          {/* Auth forms */}
+          {showSignIn ? (
+            <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+          ) : (
+            <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+          )}
+        </div>
+
+        {/* Footer */}
+        <p
+          className="mt-4 text-center text-[11px]"
+          style={{ color: "oklch(0.4 0.02 250)" }}
         >
-          <div
-            className="h-px flex-1"
-            style={{ background: "oklch(1 0 0 / 0.15)" }}
-          />
-          <span className="text-xs">or create your own account</span>
-          <div
-            className="h-px flex-1"
-            style={{ background: "oklch(1 0 0 / 0.15)" }}
-          />
-        </div>
-      )}
-
-      {showSignIn ? (
-        <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
-      ) : (
-        <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
-      )}
+          By continuing you agree to our terms of service and privacy policy.
+        </p>
+      </motion.div>
     </div>
   );
 }

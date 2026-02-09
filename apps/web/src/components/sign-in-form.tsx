@@ -58,19 +58,7 @@ export default function SignInForm({
   }
 
   return (
-    <div
-      className="glass-panel mx-auto mt-0 w-full max-w-[480px] rounded-2xl border p-6"
-      data-glass
-      style={{
-        background: "var(--pause-glass)",
-        backdropFilter: "blur(var(--pause-blur-medium))",
-        WebkitBackdropFilter: "blur(var(--pause-blur-medium))",
-        borderColor: "oklch(1 0 0 / 0.15)",
-        boxShadow: "0 8px 32px oklch(0 0 0 / 0.3)",
-      }}
-    >
-      <h1 className="mb-6 text-center font-bold text-3xl">Welcome Back</h1>
-
+    <div>
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -82,19 +70,27 @@ export default function SignInForm({
         <div>
           <form.Field name="email">
             {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Email</Label>
+              <div className="space-y-1.5">
+                <Label
+                  className="text-[13px]"
+                  htmlFor={field.name}
+                  style={{ color: "oklch(0.7 0.02 250)" }}
+                >
+                  Email address
+                </Label>
                 <NativeInput
+                  className="rounded-xl"
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
+                  placeholder="you@example.com"
                   type="email"
                   value={field.state.value}
                 />
                 {field.state.meta.errors.map((error) => (
                   <p
-                    className="text-sm"
+                    className="text-[12px]"
                     key={error?.message}
                     style={{ color: "hsl(var(--destructive))" }}
                   >
@@ -109,19 +105,27 @@ export default function SignInForm({
         <div>
           <form.Field name="password">
             {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Password</Label>
+              <div className="space-y-1.5">
+                <Label
+                  className="text-[13px]"
+                  htmlFor={field.name}
+                  style={{ color: "oklch(0.7 0.02 250)" }}
+                >
+                  Password
+                </Label>
                 <NativeInput
+                  className="rounded-xl"
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
+                  placeholder="Enter your password"
                   type="password"
                   value={field.state.value}
                 />
                 {field.state.meta.errors.map((error) => (
                   <p
-                    className="text-sm"
+                    className="text-[12px]"
                     key={error?.message}
                     style={{ color: "hsl(var(--destructive))" }}
                   >
@@ -134,7 +138,10 @@ export default function SignInForm({
         </div>
 
         {serverError && (
-          <p className="text-sm" style={{ color: "hsl(var(--destructive))" }}>
+          <p
+            className="text-[12px]"
+            style={{ color: "hsl(var(--destructive))" }}
+          >
             {serverError}
           </p>
         )}
@@ -142,12 +149,12 @@ export default function SignInForm({
         <form.Subscribe>
           {(state) => (
             <NativeButton
-              className="w-full"
+              className="w-full rounded-xl"
               disabled={!state.canSubmit}
               loading={state.isSubmitting}
               type="submit"
             >
-              Sign In
+              Continue with Email
             </NativeButton>
           )}
         </form.Subscribe>
@@ -155,8 +162,9 @@ export default function SignInForm({
 
       <div className="mt-4 text-center">
         <button
-          className="text-muted-foreground text-sm underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          className="text-[12px] underline-offset-4 transition-colors hover:underline"
           onClick={onSwitchToSignUp}
+          style={{ color: "oklch(0.55 0.02 250)" }}
           type="button"
         >
           Need an account? Sign Up
