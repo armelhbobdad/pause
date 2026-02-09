@@ -61,9 +61,9 @@ const mocks = vi.hoisted(() => {
 // --- Mock server-only ---
 vi.mock("server-only", () => ({}));
 
-// --- Mock @ai-sdk/google ---
-vi.mock("@ai-sdk/google", () => ({
-  google: vi.fn(() => "mock-gemini-model"),
+// --- Mock model factory ---
+vi.mock("@/lib/server/model", () => ({
+  getModel: vi.fn(() => "mock-model"),
 }));
 
 // --- Mock @pause/ace (for re-export path) ---

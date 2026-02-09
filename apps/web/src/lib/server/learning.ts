@@ -1,6 +1,5 @@
 import "server-only";
 
-import { google } from "@ai-sdk/google";
 import { db } from "@pause/db";
 import {
   ghostCard,
@@ -17,6 +16,7 @@ import {
   VercelAIClient,
 } from "@/lib/server/ace";
 import { satisfactionToFeedbackSignal } from "@/lib/server/ghost-cards";
+import { getModel } from "@/lib/server/model";
 import { getOpikClient } from "@/lib/server/opik";
 import { withTimeout } from "@/lib/server/utils";
 
@@ -33,7 +33,7 @@ function getReflector(): InstanceType<typeof Reflector> {
     return reflectorInstance;
   }
   const llm = new VercelAIClient({
-    model: google("gemini-2.5-flash"),
+    model: getModel(),
   });
   reflectorInstance = new Reflector(llm);
   return reflectorInstance;
@@ -47,7 +47,7 @@ function getSkillManager(): InstanceType<typeof SkillManager> {
     return skillManagerInstance;
   }
   const llm = new VercelAIClient({
-    model: google("gemini-2.5-flash"),
+    model: getModel(),
   });
   skillManagerInstance = new SkillManager(llm);
   return skillManagerInstance;

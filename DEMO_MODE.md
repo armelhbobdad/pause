@@ -2,8 +2,8 @@
 
 > Step-by-step instructions for replicating every feature in Pause.
 
-> **IMPORTANT — Gemini Rate Limits:**
-> Pause uses **Gemini 2.5 Flash** for all AI features (Guardian, Knowledge Chat, ACE Learning). On the free tier, Google enforces a hard limit of **20 requests per minute** per model. Each Guardian interaction triggers multiple API calls (risk assessment + streaming response + Skillbook learning), so you can realistically trigger only **~5 full Guardian flows per minute** before hitting the quota.
+> **IMPORTANT — AI Provider Rate Limits:**
+> Pause uses a **configurable AI provider** (`AI_MODEL` env var) for all AI features (Guardian, Knowledge Chat, ACE Learning). The default deployment uses **Zhipu GLM-4.7-Flash** (free tier), but **Google Gemini 2.5 Flash** is also supported. Each provider has its own rate limits. Each Guardian interaction triggers multiple API calls (risk assessment + streaming response + Skillbook learning), so you can realistically trigger only **~5 full Guardian flows per minute** before hitting quotas.
 >
 > **If the Guardian shows "Guardian unavailable" with a Manual Unlock fallback**, wait ~45 seconds and try again — the quota resets on a rolling window. The deployed app on Vercel shares the same API key across all users, so concurrent judges will deplete the quota faster.
 >
@@ -203,7 +203,7 @@ The floating chat bubble in the **bottom-right corner** is the fastest way to ex
 
 ### What It Is
 
-A knowledge-base AI assistant powered by **Gemini 2.5 Flash** that answers questions about Pause, spending habits, and mindful purchasing. It runs on a separate `/api/ai/knowledge` endpoint with its own system prompt and guardrails.
+A knowledge-base AI assistant powered by the **configured AI model** that answers questions about Pause, spending habits, and mindful purchasing. It runs on a separate `/api/ai/knowledge` endpoint with its own system prompt and guardrails.
 
 ### How to Use It
 
@@ -476,6 +476,6 @@ bun run db:seed:pro
 # Start app
 bun dev
 
-# Run tests (1333 tests, all passing)
+# Run tests (1334 tests, all passing)
 bunx vitest run
 ```

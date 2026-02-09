@@ -1,4 +1,3 @@
-import { google } from "@ai-sdk/google";
 import { auth } from "@pause/auth";
 import { db } from "@pause/db";
 import { card, interaction } from "@pause/db/schema";
@@ -31,6 +30,7 @@ import { searchCouponsTool } from "@/lib/server/guardian/tools/coupon-search";
 import { presentReflectionTool } from "@/lib/server/guardian/tools/reflection-prompt";
 import { showWaitOptionTool } from "@/lib/server/guardian/tools/wait-option";
 import { presentWizardOptionTool } from "@/lib/server/guardian/tools/wizard-option";
+import { getModel } from "@/lib/server/model";
 
 import {
   buildReasoningSummary,
@@ -182,7 +182,7 @@ function resolvePurchaseContext(
 export async function POST(req: Request) {
   // Service health tracking — scaffold for Story 3.6 degradation ladder.
   // Flags are set in catch blocks; Story 3.6 will read them for tier fallback.
-  const serviceHealth = { gemini: true, opik: true, neon: true, ace: true };
+  const serviceHealth = { llm: true, opik: true, neon: true, ace: true };
 
   // --- Auth check (AC#2) ---
   const session = await auth.api.getSession({ headers: await headers() });
@@ -324,7 +324,7 @@ export async function POST(req: Request) {
 
   try {
     const result = streamText({
-      model: google("gemini-2.5-flash"),
+      model: getModel(),
       system: systemPrompt,
       messages: modelMessages,
       ...getDemoStreamOptions(),
@@ -439,7 +439,7 @@ export async function POST(req: Request) {
       headers: headers2,
     });
   } catch (error) {
-    serviceHealth.gemini = false;
+    serviceHealth.llm = false;
     const failureReason = getErrorMessage(error);
     console.error(
       `[Guardian] Degradation activated for ${interactionId}: tier=${tier}, reason=${failureReason}`

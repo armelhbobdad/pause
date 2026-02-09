@@ -42,7 +42,7 @@ graph TB
     end
 
     subgraph "external services"
-        GEMINI[Google Gemini 2.5 Flash]
+        LLM[AI Provider — configurable]
         OPIK[Opik — Observability]
         NEON[Neon PostgreSQL]
     end
@@ -52,7 +52,7 @@ graph TB
     WEB --> DB
     WEB --> ACE
     WEB --> ENV
-    WEB --> GEMINI
+    WEB --> LLM
     WEB --> OPIK
     API --> AUTH
     API --> DB
@@ -110,7 +110,7 @@ graph TB
 | Runtime | Bun |
 | Database | Drizzle ORM + Neon PostgreSQL |
 | Auth | Better Auth (email/password) |
-| AI | Vercel AI SDK v6 + Google Gemini 2.5 Flash |
+| AI | Vercel AI SDK v6 + configurable provider (Google Gemini / Zhipu GLM-4.7-Flash) |
 | Learning | ACE (Agentic Context Engine) — vendored fork |
 | Observability | Opik + OpenTelemetry |
 | UI | Framer Motion, shadcn/ui, Tailwind CSS 4, uitripled components |
@@ -122,7 +122,7 @@ graph TB
 - [Node.js](https://nodejs.org/) 20+
 - [Bun](https://bun.sh/) 1.x
 - [Neon](https://neon.tech/) PostgreSQL account (or local Postgres)
-- Google AI API key (Gemini)
+- AI provider API key (Google Gemini or Zhipu GLM-4.7-Flash)
 
 ## Quick Start
 
@@ -156,7 +156,9 @@ The app runs at `http://localhost:3001`.
 | `DATABASE_URL_LOCAL` | No | Local proxy URL (overrides DATABASE_URL in dev) |
 | `BETTER_AUTH_SECRET` | Yes | Session encryption secret (32+ characters) |
 | `BETTER_AUTH_URL` | Yes | Base URL (`http://localhost:3001` in dev) |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | Yes | Google AI API key for Gemini |
+| `AI_MODEL` | No | Model selection in `provider:model` format (default: `zhipu:glm-4.7-Flash`) |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | When using Google | Google AI API key for Gemini |
+| `ZHIPU_API_KEY` | When using Zhipu | Z.AI API key for GLM-4.7-Flash |
 | `OPIK_API_KEY` | Production only | Opik tracing API key |
 | `OPIK_PROJECT_NAME` | No | Opik project name (default: `pause`) |
 | `OPIK_WORKSPACE` | No | Opik workspace for team separation |
@@ -198,6 +200,7 @@ bun test             # Run test suite
 - [**Better-T-Stack**](https://www.better-t-stack.dev/) — For the strong project foundation
 - [**Neon**](https://neon.com/) — For free-tier PostgreSQL credits
 - [**Vercel**](https://vercel.com/) — For free-tier hosting
+- [**Zhipu AI**](https://z.ai/) — For free-tier GLM-4.7-Flash API access
 - [**Google DeepMind**](https://deepmind.google/) — For free-tier Gemini 2.5 Flash credits
 - [**Opik**](https://www.comet.com/site/products/opik/) — For free-tier observability platform credits
 - [**Kayba AI**](https://kayba.ai/) — For the [TypeScript port of the ACE framework](https://github.com/kayba-ai/ace-ts)
