@@ -336,7 +336,7 @@ function CommandCenterInner({
           padding: "1rem",
         }}
       >
-        <div style={{ position: "relative" }}>
+        <div id="tour-card-vault" style={{ position: "relative" }}>
           <CardVault
             card={card}
             countdownDuration={countdownDuration}

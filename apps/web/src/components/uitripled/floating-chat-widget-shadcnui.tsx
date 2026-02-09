@@ -297,6 +297,7 @@ export function FloatingChatWidget({
             ? "bg-destructive text-destructive-foreground"
             : "text-primary-foreground hover:shadow-primary/25"
         )}
+        id="tour-chat-bubble"
         onClick={toggleOpen}
         ref={bubbleRef}
         style={
