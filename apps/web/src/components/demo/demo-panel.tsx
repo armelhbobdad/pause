@@ -67,14 +67,14 @@ function DemoPanelContent() {
   const { startTour } = useTour();
   const isOnDashboard = pathname === "/dashboard";
 
-  // 3-second entrance pulse to draw judge's eye
+  // 3-second entrance pulse to draw judge's eye (only on dashboard)
   useEffect(() => {
-    if (hasPulsed) {
+    if (!isOnDashboard || hasPulsed) {
       return;
     }
     const timer = setTimeout(() => setHasPulsed(true), 3000);
     return () => clearTimeout(timer);
-  }, [hasPulsed]);
+  }, [isOnDashboard, hasPulsed]);
 
   // Click-outside to close
   useEffect(() => {
@@ -141,6 +141,11 @@ function DemoPanelContent() {
     [handleTourStart, handleProfileSwitch]
   );
 
+  let pillLabel = "Demo mode — available on dashboard";
+  if (isOnDashboard) {
+    pillLabel = isOpen ? "Close demo panel" : "Open demo panel";
+  }
+
   return (
     <div
       id="tour-demo-panel"
@@ -154,10 +159,11 @@ function DemoPanelContent() {
     >
       {/* Floating DEMO Pill Trigger */}
       <motion.button
-        aria-expanded={isOpen}
-        aria-label={isOpen ? "Close demo panel" : "Open demo panel"}
-        className="group relative cursor-pointer overflow-hidden"
-        onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOnDashboard ? isOpen : undefined}
+        aria-label={pillLabel}
+        className="group relative overflow-hidden"
+        disabled={!isOnDashboard}
+        onClick={() => isOnDashboard && setIsOpen((prev) => !prev)}
         style={{
           padding: "8px 20px",
           borderRadius: 12,
@@ -166,22 +172,31 @@ function DemoPanelContent() {
           fontWeight: 700,
           letterSpacing: "0.1em",
           lineHeight: "22px",
-          color: "oklch(0.95 0.03 260)",
-          border: "1px solid oklch(0.55 0.18 260 / 0.5)",
-          background:
-            "linear-gradient(135deg, oklch(0.28 0.12 260 / 0.95), oklch(0.22 0.15 280 / 0.95))",
+          cursor: isOnDashboard ? "pointer" : "default",
+          color: isOnDashboard
+            ? "oklch(0.95 0.03 260)"
+            : "oklch(0.65 0.02 260)",
+          border: isOnDashboard
+            ? "1px solid oklch(0.55 0.18 260 / 0.5)"
+            : "1px solid oklch(0.4 0.08 260 / 0.3)",
+          background: isOnDashboard
+            ? "linear-gradient(135deg, oklch(0.28 0.12 260 / 0.95), oklch(0.22 0.15 280 / 0.95))"
+            : "linear-gradient(135deg, oklch(0.22 0.06 260 / 0.7), oklch(0.18 0.08 280 / 0.7))",
           boxShadow: isOpen
             ? "0 0 0 2px oklch(0.65 0.2 260 / 0.4), 0 4px 20px oklch(0.3 0.15 260 / 0.5)"
             : "0 2px 12px oklch(0.2 0.12 260 / 0.4)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
+          opacity: isOnDashboard ? 1 : 0.6,
         }}
         type="button"
-        whileHover={shouldReduceMotion ? {} : { scale: 1.04, y: -1 }}
-        whileTap={shouldReduceMotion ? {} : { scale: 0.97 }}
+        whileHover={
+          !isOnDashboard || shouldReduceMotion ? {} : { scale: 1.04, y: -1 }
+        }
+        whileTap={!isOnDashboard || shouldReduceMotion ? {} : { scale: 0.97 }}
       >
-        {/* Entrance pulse glow */}
-        {!(hasPulsed || shouldReduceMotion) && (
+        {/* Entrance pulse glow (dashboard only) */}
+        {isOnDashboard && !(hasPulsed || shouldReduceMotion) && (
           <motion.span
             animate={{
               opacity: [0, 0.6, 0],
@@ -203,8 +218,8 @@ function DemoPanelContent() {
           />
         )}
 
-        {/* Shimmer sweep on the pill */}
-        {!shouldReduceMotion && (
+        {/* Shimmer sweep on the pill (dashboard only) */}
+        {isOnDashboard && !shouldReduceMotion && (
           <motion.span
             animate={{ x: ["-120%", "120%"] }}
             aria-hidden="true"

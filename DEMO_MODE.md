@@ -97,7 +97,7 @@ Running either seed command automatically **cleans existing demo data first** �
 bun dev
 ```
 
-Open `http://localhost:3001`. You should see the **"DEMO"** pill in the bottom-left corner.
+Open `http://localhost:3001`. You should see the **"DEMO"** pill in the bottom-left corner on every page. The pill is **disabled** (muted, non-interactive) until you sign in and reach the dashboard.
 
 ## 4. Create an Account & Sign In
 
@@ -112,17 +112,26 @@ Open `http://localhost:3001`. You should see the **"DEMO"** pill in the bottom-l
 
 ## 5. Floating Demo Panel
 
-The **DEMO** pill in the bottom-left corner is an interactive control panel for judges. Click it to reveal a glassmorphic menu.
+The **DEMO** pill in the bottom-left corner is visible on every page as a branding indicator. It becomes an **interactive control panel** only on the dashboard, where a signed-in user can switch profiles and start the guided tour.
 
-### What It Shows
+### Visibility vs. Interactivity
 
-The menu adapts based on context:
+| Page | Pill Visible | Interactive | Why |
+|------|:----------:|:-----------:|-----|
+| Home (`/`) | Yes | No (disabled, muted) | No user signed in — nothing to switch |
+| Login (`/login`) | Yes | No (disabled, muted) | No user signed in — nothing to switch |
+| Dashboard (`/dashboard`) | Yes | **Yes** (full menu) | Signed in — profile switching + guided tour available |
 
-| Page | Menu Items | Why |
-|------|-----------|-----|
-| Home (`/`) | Rookie Profile, Pro Profile | Browse both profiles (sign in first to switch) |
-| Login (`/login`) | Rookie Profile, Pro Profile | Same as home |
-| Dashboard (`/dashboard`) | *Opposite* profile only, Start Guided Tour | Already signed in — only show what you can switch to |
+On non-dashboard pages the pill appears at 60% opacity with desaturated colors, no hover effects, and no animations (pulse/shimmer). On the dashboard it's fully vibrant and clickable.
+
+### What the Menu Shows (Dashboard)
+
+Click the pill on the dashboard to reveal a glassmorphic menu:
+
+| Menu Items | Details |
+|-----------|---------|
+| *Opposite* profile only | Already signed in — only show what you can switch to |
+| Start Guided Tour | 6-step walkthrough of dashboard features |
 
 ### Profile Switching (Dashboard Only)
 
@@ -144,12 +153,13 @@ When signed in on the dashboard, click a profile to **instantly switch** between
 | Ghost Cards | None | 1 pending |
 | Good Friction Score | 0% | 83% |
 
-### Animations
+### Animations (Dashboard Only)
 
-- **Entrance pulse** — a 3-second glow animation on first page load draws attention to the pill
+- **Entrance pulse** — a 3-second glow animation on first dashboard load draws attention to the pill
 - **Shimmer sweep** — a subtle light sweep loops across the pill surface
 - **Spring menu** — the menu card appears with a spring animation and staggered item reveal
 - All animations respect `prefers-reduced-motion`
+- On non-dashboard pages, animations are suppressed — the pill is a static, muted badge
 
 ### Interactions
 
@@ -412,7 +422,7 @@ View traces at [comet.com/opik](https://www.comet.com/opik) under your project.
 | AI Temperature | Model default | `temperature: 0` (deterministic) |
 | AI Seed | None | `seed: 42` (reproducible) |
 | Coupon Provider | Real API (returns empty) | Mock coupons with realistic data |
-| Demo Panel | Hidden | Floating "DEMO" pill with profile switching + guided tour |
+| Demo Panel | Hidden | Floating "DEMO" pill on all pages; interactive (profile switching + guided tour) only on dashboard |
 | Profile Switching | Unavailable | Switch between Rookie/Pro via `POST /api/demo/switch-profile` |
 | Guided Tour | Unavailable | 6-step OnboardJS tour of dashboard features |
 | Seed Scripts | Blocked (safety gate) | Allowed |
