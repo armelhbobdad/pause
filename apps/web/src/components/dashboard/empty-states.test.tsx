@@ -90,7 +90,7 @@ describe("Conditional rendering — empty vs populated", () => {
     );
 
     expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
-    expect(screen.getByText("accepted")).toBeInTheDocument();
+    expect(screen.getByText("Accepted")).toBeInTheDocument();
   });
 
   it("savings shows empty state when deal count is 0", () => {

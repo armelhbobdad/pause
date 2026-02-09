@@ -31,6 +31,21 @@ vi.mock("@pause/db/schema", () => ({
   ghostCard: { userId: "ghostCard.userId" },
 }));
 
+vi.mock("@pause/db/schema/auth", () => ({
+  session: { userId: "session.userId" },
+  account: {
+    id: "account.id",
+    accountId: "account.accountId",
+    providerId: "account.providerId",
+    userId: "account.userId",
+    password: "account.password",
+  },
+}));
+
+vi.mock("better-auth/crypto", () => ({
+  hashPassword: vi.fn().mockResolvedValue("hashed-demo-password"),
+}));
+
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ type: "eq", args })),
   inArray: vi.fn((...args: unknown[]) => ({ type: "inArray", args })),
@@ -132,8 +147,8 @@ describe("seedPro", () => {
     const { seedPro } = await import("@/lib/server/seed/pro");
     await seedPro();
 
-    // inserts: user(0), card(1), int1-6(2-7), sav1-3(8-10), skillbook(11), ghostCard(12)
-    expect(mockInsert).toHaveBeenCalledTimes(13);
+    // inserts: user(0), card(1), int1-6(2-7), sav1-3(8-10), skillbook(11), ghostCard(12), account(13)
+    expect(mockInsert).toHaveBeenCalledTimes(14);
 
     const interactionCalls = mockValues.mock.calls.slice(2, 8);
     const tiers = interactionCalls.map(
@@ -238,9 +253,14 @@ describe("seedPro", () => {
 
     const interactionCalls = mockValues.mock.calls.slice(2, 8);
     for (const call of interactionCalls) {
-      const meta = (call[0] as Record<string, Record<string, string>>).metadata;
+      const meta = (call[0] as Record<string, Record<string, unknown>>)
+        .metadata;
       expect(meta).toHaveProperty("purchaseContext");
-      expect(typeof meta.purchaseContext).toBe("string");
+      expect(typeof meta.purchaseContext).toBe("object");
+      const ctx = meta.purchaseContext as Record<string, unknown>;
+      expect(ctx).toHaveProperty("itemName");
+      expect(ctx).toHaveProperty("price");
+      expect(ctx).toHaveProperty("merchant");
     }
   });
 

@@ -31,6 +31,17 @@ const NEUTRAL_OUTCOMES: Record<string, string> = {
   timeout: "Session timed out",
 };
 
+/** Human-friendly labels for all outcome values */
+const OUTCOME_LABELS: Record<string, string> = {
+  auto_approved: "Auto-approved",
+  accepted: "Accepted",
+  overridden: "Overridden",
+  wait: "Chose to wait",
+  break_glass: "Emergency unlock",
+  wizard_bookmark: "Bookmarked",
+  wizard_abandoned: "Wizard abandoned",
+};
+
 export function RecentInteractions({ interactions }: RecentInteractionsProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -81,7 +92,11 @@ export function RecentInteractions({ interactions }: RecentInteractionsProps) {
                 }
                 style={neutralLabel ? { opacity: 0.6 } : undefined}
               >
-                {neutralLabel ?? interaction.outcome ?? "pending"}
+                {neutralLabel ??
+                  (interaction.outcome
+                    ? (OUTCOME_LABELS[interaction.outcome] ??
+                      interaction.outcome)
+                    : "pending")}
               </span>
               <span className="text-muted-foreground text-xs">
                 {interaction.cardLastFour

@@ -17,6 +17,12 @@ export const DEMO_USER_EMAIL = "alex@demo.pause.app";
 /** Demo card ID */
 export const DEMO_CARD_ID = "demo-card-4242";
 
+/** Demo account ID */
+export const DEMO_ACCOUNT_ID = "demo-account";
+
+/** Demo password (for auto-login in demo mode) */
+export const DEMO_PASSWORD = "demopass1";
+
 /**
  * Checks that the environment is safe for running seed scripts.
  * Throws if DEMO_MODE is not enabled and --force flag is not provided.

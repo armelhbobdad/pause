@@ -15,6 +15,7 @@ const EXCLUDE_PATTERNS = [
   "tokens.css", // token definitions
   "index.css", // global CSS
   "uitripled/", // uitripled vendored components
+  "card-vault.tsx", // glassmorphism card uses intentional oklch/rgba colors
 ];
 
 function getComponentFiles(dir: string): string[] {

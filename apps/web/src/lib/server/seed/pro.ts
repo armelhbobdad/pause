@@ -91,7 +91,13 @@ export async function seedPro(): Promise<void> {
     outcome: "auto_approved",
     riskScore: 15,
     status: "completed",
-    metadata: { purchaseContext: "Coffee subscription - $12/month" },
+    metadata: {
+      purchaseContext: {
+        itemName: "Coffee subscription",
+        price: 1200,
+        merchant: "Blue Bottle Coffee",
+      },
+    },
     reasoningSummary:
       "Low-risk recurring purchase. Auto-approved based on amount and history.",
     createdAt: new Date(now - 14 * DAY),
@@ -105,7 +111,13 @@ export async function seedPro(): Promise<void> {
     outcome: "accepted",
     riskScore: 45,
     status: "completed",
-    metadata: { purchaseContext: "Bluetooth speaker - $79" },
+    metadata: {
+      purchaseContext: {
+        itemName: "Bluetooth speaker",
+        price: 7900,
+        merchant: "Amazon",
+      },
+    },
     reasoningSummary:
       "Found coupon TECH20 saving $15. User accepted after seeing savings.",
     createdAt: new Date(now - 10 * DAY),
@@ -119,7 +131,13 @@ export async function seedPro(): Promise<void> {
     outcome: "wait",
     riskScore: 72,
     status: "feedback_received",
-    metadata: { purchaseContext: "Designer shoes - $250" },
+    metadata: {
+      purchaseContext: {
+        itemName: "Designer shoes",
+        price: 25_000,
+        merchant: "Nordstrom",
+      },
+    },
     reasoningSummary:
       "High-risk impulse purchase. User chose to wait after future-self reflection.",
     createdAt: new Date(now - 7 * DAY),
@@ -133,7 +151,13 @@ export async function seedPro(): Promise<void> {
     outcome: "overridden",
     riskScore: 50,
     status: "completed",
-    metadata: { purchaseContext: "Gaming mouse - $65" },
+    metadata: {
+      purchaseContext: {
+        itemName: "Gaming mouse",
+        price: 6500,
+        merchant: "Best Buy",
+      },
+    },
     reasoningSummary:
       "Found price match saving $20. User overrode Guardian recommendation.",
     createdAt: new Date(now - 5 * DAY),
@@ -147,7 +171,13 @@ export async function seedPro(): Promise<void> {
     outcome: "accepted",
     riskScore: 65,
     status: "feedback_received",
-    metadata: { purchaseContext: "Wireless headphones - $89" },
+    metadata: {
+      purchaseContext: {
+        itemName: "Wireless headphones",
+        price: 8900,
+        merchant: "Apple Store",
+      },
+    },
     reasoningSummary:
       "Moderate-risk purchase. User accepted after cost reframe and reflection.",
     createdAt: new Date(now - 3 * DAY),
@@ -161,7 +191,13 @@ export async function seedPro(): Promise<void> {
     outcome: "auto_approved",
     riskScore: 20,
     status: "completed",
-    metadata: { purchaseContext: "Phone case - $15" },
+    metadata: {
+      purchaseContext: {
+        itemName: "Phone case",
+        price: 1500,
+        merchant: "Amazon",
+      },
+    },
     reasoningSummary:
       "Low-risk accessory purchase. Auto-approved based on amount.",
     createdAt: new Date(now - 1 * DAY),
@@ -210,6 +246,19 @@ export async function seedPro(): Promise<void> {
     userId: DEMO_USER_ID,
     interactionId: "int-5",
     status: "pending",
+  });
+
+  // 7. Auth account with password (for demo login button)
+  const { account: accountTable } = await import("@pause/db/schema/auth");
+  const { hashPassword } = await import("better-auth/crypto");
+  const { DEMO_ACCOUNT_ID, DEMO_PASSWORD } = await import("./constants");
+  const hashedPw = await hashPassword(DEMO_PASSWORD);
+  await db.insert(accountTable).values({
+    id: DEMO_ACCOUNT_ID,
+    accountId: DEMO_USER_ID,
+    providerId: "credential",
+    userId: DEMO_USER_ID,
+    password: hashedPw,
   });
 
   console.log("Pro state seeded successfully");

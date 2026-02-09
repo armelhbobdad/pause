@@ -373,7 +373,7 @@ function CommandCenterInner({
       style={{
         display: "grid",
         gridTemplateRows: "minmax(0, 2fr) minmax(0, 3fr)",
-        height: "100dvh",
+        height: "100%",
         overflow: "hidden",
       }}
     >

@@ -18,7 +18,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     >
       <QueryClientProvider client={queryClient}>
         {children}
-        <ReactQueryDevtools />
+        {process.env.NODE_ENV === "development" &&
+          !process.env.NEXT_PUBLIC_DEMO_MODE && <ReactQueryDevtools />}
       </QueryClientProvider>
       <Toaster richColors />
     </ThemeProvider>

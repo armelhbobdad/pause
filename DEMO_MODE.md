@@ -48,6 +48,7 @@ bun run db:seed:rookie
 ```
 
 Creates:
+
 | Entity | Details |
 |--------|---------|
 | User | Alex (`alex@demo.pause.app`) |
@@ -64,6 +65,7 @@ bun run db:seed:pro
 ```
 
 Creates:
+
 | Entity | Details |
 |--------|---------|
 | User | Alex (`alex@demo.pause.app`, 30 days old) |
@@ -375,6 +377,6 @@ bun run db:seed:pro
 # Start app
 bun dev
 
-# Run tests (1309 tests, all passing)
+# Run tests (1337 tests, all passing)
 bun test
 ```

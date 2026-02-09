@@ -39,6 +39,13 @@ export async function cleanDemoData(userId: string): Promise<void> {
     return;
   }
 
+  // 0. Delete sessions and accounts (auth tables, must precede user)
+  const { session: sessionTable, account: accountTable } = await import(
+    "@pause/db/schema/auth"
+  );
+  await db.delete(sessionTable).where(eq(sessionTable.userId, userId));
+  await db.delete(accountTable).where(eq(accountTable.userId, userId));
+
   // 1. Delete ghost cards (has userId)
   await db.delete(ghostCard).where(eq(ghostCard.userId, userId));
 

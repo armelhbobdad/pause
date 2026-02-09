@@ -268,7 +268,7 @@ describe("Dashboard", () => {
     );
 
     // RecentInteractions renders
-    expect(screen.getByText("accepted")).toBeInTheDocument();
+    expect(screen.getByText("Accepted")).toBeInTheDocument();
     expect(screen.getByText("••1234")).toBeInTheDocument();
   });
 

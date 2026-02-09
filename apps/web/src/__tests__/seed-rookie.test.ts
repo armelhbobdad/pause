@@ -31,6 +31,21 @@ vi.mock("@pause/db/schema", () => ({
   ghostCard: { userId: "ghostCard.userId" },
 }));
 
+vi.mock("@pause/db/schema/auth", () => ({
+  session: { userId: "session.userId" },
+  account: {
+    id: "account.id",
+    accountId: "account.accountId",
+    providerId: "account.providerId",
+    userId: "account.userId",
+    password: "account.password",
+  },
+}));
+
+vi.mock("better-auth/crypto", () => ({
+  hashPassword: vi.fn().mockResolvedValue("hashed-demo-password"),
+}));
+
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ type: "eq", args })),
   inArray: vi.fn((...args: unknown[]) => ({ type: "inArray", args })),
@@ -81,11 +96,11 @@ describe("seedRookie", () => {
     }
   });
 
-  it("calls insert 3 times (user, card, skillbook)", async () => {
+  it("calls insert 4 times (user, card, skillbook, account)", async () => {
     const { seedRookie } = await import("@/lib/server/seed/rookie");
     await seedRookie();
 
-    expect(mockInsert).toHaveBeenCalledTimes(3);
+    expect(mockInsert).toHaveBeenCalledTimes(4);
   });
 
   it("creates user with correct fields", async () => {

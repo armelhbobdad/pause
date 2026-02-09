@@ -65,10 +65,10 @@ describe("RecentInteractions", () => {
     expect(screen.getAllByLabelText("negotiator tier")).toHaveLength(2);
     expect(screen.getByLabelText("therapist tier")).toBeInTheDocument();
 
-    // Check outcomes
-    expect(screen.getAllByText("accepted")).toHaveLength(2);
-    expect(screen.getByText("overridden")).toBeInTheDocument();
-    expect(screen.getByText("wait")).toBeInTheDocument();
+    // Check outcomes (OUTCOME_LABELS maps raw values to human-friendly labels)
+    expect(screen.getAllByText("Accepted")).toHaveLength(2);
+    expect(screen.getByText("Overridden")).toBeInTheDocument();
+    expect(screen.getByText("Chose to wait")).toBeInTheDocument();
 
     // Check card last four
     expect(screen.getByText("••1234")).toBeInTheDocument();

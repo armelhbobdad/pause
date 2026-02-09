@@ -41,6 +41,19 @@ export async function seedRookie(): Promise<void> {
     version: 1,
   });
 
+  // Auth account with password (for demo login button)
+  const { account: accountTable } = await import("@pause/db/schema/auth");
+  const { hashPassword } = await import("better-auth/crypto");
+  const { DEMO_ACCOUNT_ID, DEMO_PASSWORD } = await import("./constants");
+  const hashedPw = await hashPassword(DEMO_PASSWORD);
+  await db.insert(accountTable).values({
+    id: DEMO_ACCOUNT_ID,
+    accountId: DEMO_USER_ID,
+    providerId: "credential",
+    userId: DEMO_USER_ID,
+    password: hashedPw,
+  });
+
   console.log("✓ Rookie state seeded successfully");
   console.log("  User:      Alex (demo-user)");
   console.log("  Card:      **** 4242 (Demo Card)");

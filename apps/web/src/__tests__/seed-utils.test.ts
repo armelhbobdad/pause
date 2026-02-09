@@ -30,6 +30,11 @@ vi.mock("@pause/db/schema", () => ({
   ghostCard: { userId: "ghostCard.userId" },
 }));
 
+vi.mock("@pause/db/schema/auth", () => ({
+  session: { userId: "session.userId" },
+  account: { userId: "account.userId" },
+}));
+
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ type: "eq", args })),
   inArray: vi.fn((...args: unknown[]) => ({ type: "inArray", args })),
@@ -149,7 +154,7 @@ describe("cleanDemoData", () => {
     const { cleanDemoData } = await import("@/lib/server/seed/clean");
     await cleanDemoData("demo-user");
 
-    // 6 deletes: ghostCard, savings, interaction, card, skillbook, user
-    expect(mockDelete).toHaveBeenCalledTimes(6);
+    // 8 deletes: session, account, ghostCard, savings, interaction, card, skillbook, user
+    expect(mockDelete).toHaveBeenCalledTimes(8);
   });
 });
