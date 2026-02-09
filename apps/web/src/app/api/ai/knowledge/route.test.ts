@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
         headers: { "content-type": "text/event-stream" },
       })
   );
-  const mockGoogle = vi.fn(() => "gemini-2.5-flash-model");
+  const mockGetModel = vi.fn(() => "mock-model");
   const mockGetGuardianTelemetry = vi.fn(() => ({
     isEnabled: true,
     metadata: {},
@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => {
     mockStreamText,
     mockConvertToModelMessages,
     mockToUIMessageStreamResponse,
-    mockGoogle,
+    mockGetModel,
     mockGetGuardianTelemetry,
   };
 });
@@ -35,8 +35,8 @@ vi.mock("ai", () => ({
   streamText: mocks.mockStreamText,
 }));
 
-vi.mock("@ai-sdk/google", () => ({
-  google: mocks.mockGoogle,
+vi.mock("@/lib/server/model", () => ({
+  getModel: mocks.mockGetModel,
 }));
 
 vi.mock("@/lib/server/opik", () => ({
@@ -63,13 +63,13 @@ describe("/api/ai/knowledge route (Story 10.6)", () => {
     });
   });
 
-  it("calls streamText with google gemini-2.5-flash model", async () => {
+  it("calls streamText with the configured model from getModel()", async () => {
     await POST(createPostRequest([{ role: "user", content: "Hello" }]));
 
-    expect(mocks.mockGoogle).toHaveBeenCalledWith("gemini-2.5-flash");
+    expect(mocks.mockGetModel).toHaveBeenCalled();
     expect(mocks.mockStreamText).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: "gemini-2.5-flash-model",
+        model: "mock-model",
       })
     );
   });

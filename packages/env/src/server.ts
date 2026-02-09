@@ -34,8 +34,18 @@ export const env = createEnv({
       ),
     OPIK_PROJECT_NAME: z.string().min(1).default("pause"),
     OPIK_WORKSPACE: z.string().min(1).optional(),
-    // Google Generative AI: required for Gemini model
-    GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1),
+    // AI model selection: "provider:model" format (e.g., "google:gemini-2.5-flash", "zhipu:glm-4.7")
+    AI_MODEL: z
+      .string()
+      .regex(/^[a-z]+:[a-z0-9._-]+$/i, {
+        message:
+          'AI_MODEL must match "provider:model" format (e.g., "google:gemini-2.5-flash")',
+      })
+      .default("zhipu:glm-4.7-Flash"),
+    // Google Generative AI: required when AI_MODEL starts with "google:"
+    GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
+    // Z.AI / Zhipu API key: required when AI_MODEL starts with "zhipu:"
+    ZHIPU_API_KEY: z.string().min(1).optional(),
     // Referral card: consecutive high-risk override threshold
     REFERRAL_THRESHOLD: z.coerce.number().int().min(1).default(3),
     // Demo mode: controls trace tagging and feature flags

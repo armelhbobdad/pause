@@ -167,8 +167,8 @@ vi.mock("@/lib/server/guardian/tools/coupon-provider", () => ({
   searchCoupons: mocks.mockSearchCoupons,
 }));
 
-vi.mock("@ai-sdk/google", () => ({
-  google: vi.fn(() => "mock-gemini-model"),
+vi.mock("@/lib/server/model", () => ({
+  getModel: vi.fn(() => "mock-model"),
 }));
 
 // --- Mock server-side Guardian utilities ---

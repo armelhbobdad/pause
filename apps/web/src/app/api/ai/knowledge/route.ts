@@ -1,6 +1,6 @@
-import { google } from "@ai-sdk/google";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 
+import { getModel } from "@/lib/server/model";
 import { getGuardianTelemetry } from "@/lib/server/opik";
 
 export const runtime = "nodejs";
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
   const result = streamText({
-    model: google("gemini-2.5-flash"),
+    model: getModel(),
     system: KNOWLEDGE_SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
     experimental_telemetry: getGuardianTelemetry(

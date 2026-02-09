@@ -112,9 +112,9 @@ vi.mock("ai", () => ({
   tool: vi.fn((def: unknown) => def),
 }));
 
-// --- Mock Google provider ---
-vi.mock("@ai-sdk/google", () => ({
-  google: vi.fn(() => "mock-gemini-model"),
+// --- Mock model factory ---
+vi.mock("@/lib/server/model", () => ({
+  getModel: vi.fn(() => "mock-model"),
 }));
 
 // --- Mock tool-names (shared type) ---
