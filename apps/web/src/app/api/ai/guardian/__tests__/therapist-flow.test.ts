@@ -49,6 +49,11 @@ vi.mock("@pause/auth", () => ({
   },
 }));
 
+// --- Mock @pause/env/server ---
+vi.mock("@pause/env/server", () => ({
+  env: { DEMO_MODE: "false" },
+}));
+
 // --- Mock @pause/db ---
 vi.mock("@pause/db", () => {
   const selectChain = {

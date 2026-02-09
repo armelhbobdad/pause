@@ -47,7 +47,7 @@ export function SavingsBreakdown({
   return (
     <Card
       aria-label="Savings breakdown"
-      className="rounded-2xl p-4"
+      className="glass-card rounded-2xl p-4"
       data-testid="savings-breakdown"
       role="region"
     >

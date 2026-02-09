@@ -1,13 +1,15 @@
+"use client";
+
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useState } from "react";
 import z from "zod";
 
+import { NativeButton } from "@/components/uitripled/native-button-shadcnui";
+import { NativeInput } from "@/components/uitripled/native-input-shadcnui";
 import { authClient } from "@/lib/auth-client";
 
 import Loader from "./loader";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
 export default function SignInForm({
@@ -17,6 +19,7 @@ export default function SignInForm({
 }) {
   const router = useRouter();
   const { isPending } = authClient.useSession();
+  const [serverError, setServerError] = useState("");
 
   const form = useForm({
     defaultValues: {
@@ -24,6 +27,7 @@ export default function SignInForm({
       password: "",
     },
     onSubmit: async ({ value }) => {
+      setServerError("");
       await authClient.signIn.email(
         {
           email: value.email,
@@ -32,10 +36,11 @@ export default function SignInForm({
         {
           onSuccess: () => {
             router.push("/dashboard");
-            toast.success("Sign in successful");
           },
           onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
+            setServerError(
+              error.error.message || error.error.statusText || "Sign in failed"
+            );
           },
         }
       );
@@ -53,7 +58,17 @@ export default function SignInForm({
   }
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-md p-6">
+    <div
+      className="glass-panel mx-auto mt-0 w-full max-w-[480px] rounded-2xl border p-6"
+      data-glass
+      style={{
+        background: "var(--pause-glass)",
+        backdropFilter: "blur(var(--pause-blur-medium))",
+        WebkitBackdropFilter: "blur(var(--pause-blur-medium))",
+        borderColor: "oklch(1 0 0 / 0.15)",
+        boxShadow: "0 8px 32px oklch(0 0 0 / 0.3)",
+      }}
+    >
       <h1 className="mb-6 text-center font-bold text-3xl">Welcome Back</h1>
 
       <form
@@ -69,7 +84,7 @@ export default function SignInForm({
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Email</Label>
-                <Input
+                <NativeInput
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}
@@ -78,7 +93,11 @@ export default function SignInForm({
                   value={field.state.value}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p className="text-red-500" key={error?.message}>
+                  <p
+                    className="text-sm"
+                    key={error?.message}
+                    style={{ color: "hsl(var(--destructive))" }}
+                  >
                     {error?.message}
                   </p>
                 ))}
@@ -92,7 +111,7 @@ export default function SignInForm({
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Password</Label>
-                <Input
+                <NativeInput
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}
@@ -101,7 +120,11 @@ export default function SignInForm({
                   value={field.state.value}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p className="text-red-500" key={error?.message}>
+                  <p
+                    className="text-sm"
+                    key={error?.message}
+                    style={{ color: "hsl(var(--destructive))" }}
+                  >
                     {error?.message}
                   </p>
                 ))}
@@ -110,27 +133,34 @@ export default function SignInForm({
           </form.Field>
         </div>
 
+        {serverError && (
+          <p className="text-sm" style={{ color: "hsl(var(--destructive))" }}>
+            {serverError}
+          </p>
+        )}
+
         <form.Subscribe>
           {(state) => (
-            <Button
+            <NativeButton
               className="w-full"
-              disabled={!state.canSubmit || state.isSubmitting}
+              disabled={!state.canSubmit}
+              loading={state.isSubmitting}
               type="submit"
             >
-              {state.isSubmitting ? "Submitting..." : "Sign In"}
-            </Button>
+              Sign In
+            </NativeButton>
           )}
         </form.Subscribe>
       </form>
 
       <div className="mt-4 text-center">
-        <Button
-          className="text-indigo-600 hover:text-indigo-800"
+        <button
+          className="text-muted-foreground text-sm underline-offset-4 transition-colors hover:text-foreground hover:underline"
           onClick={onSwitchToSignUp}
-          variant="link"
+          type="button"
         >
           Need an account? Sign Up
-        </Button>
+        </button>
       </div>
     </div>
   );

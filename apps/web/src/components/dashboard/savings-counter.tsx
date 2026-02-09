@@ -65,11 +65,11 @@ export function SavingsCounter({ totalCents }: SavingsCounterProps) {
   return (
     <output
       aria-live="polite"
-      className="flex items-baseline gap-1"
+      className="glass-card flex items-baseline gap-1 px-4 py-3"
       data-testid="savings-counter"
     >
       <span
-        className="font-bold text-2xl"
+        className="font-bold text-2xl tabular-nums"
         data-testid="savings-counter-value"
         style={{
           fontFamily: "var(--font-data)",

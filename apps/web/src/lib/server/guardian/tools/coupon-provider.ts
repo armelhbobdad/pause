@@ -10,7 +10,7 @@ export interface CouponResult {
 }
 
 interface SearchParams {
-  merchant: string;
+  merchant?: string;
   category: string;
   productName?: string;
   price?: number;

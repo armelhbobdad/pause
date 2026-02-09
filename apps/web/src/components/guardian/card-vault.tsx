@@ -1,6 +1,13 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import {
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+} from "framer-motion";
+import type { KeyboardEvent, MouseEvent } from "react";
 import { CountdownTimer } from "@/components/guardian/countdown-timer";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RevealType } from "@/lib/guardian/types";
@@ -49,28 +56,29 @@ export interface CardVaultProps {
 }
 
 // ============================================================================
-// Card Chip Component (CSS-only visual element)
-// Note: Chip uses gold oklch colors (H=50) intentionally hardcoded - these are
-// decorative chip element colors not part of the Guardian design token system.
+// Card Visual Constants
 // ============================================================================
 
-const CHIP_GRADIENT =
-  "linear-gradient(135deg, oklch(0.7 0.05 50) 0%, oklch(0.6 0.05 50) 100%)";
-const CHIP_CELL_BG = "oklch(0.5 0.03 50)";
+const CARD_GRADIENT =
+  "linear-gradient(145deg, oklch(0.25 0.06 250), oklch(0.16 0.03 250))";
+
+const OVERLAY_LIGHTS = [
+  "radial-gradient(circle at 20% 30%, oklch(0.9 0 0 / 0.06), transparent 55%)",
+  "radial-gradient(circle at 80% 20%, oklch(0.5 0.12 250 / 0.25), transparent 60%)",
+  "radial-gradient(circle at 50% 80%, oklch(0.5 0.08 280 / 0.18), transparent 65%)",
+].join(",");
+
+// ============================================================================
+// Card Chip Component (glassmorphism chip element)
+// ============================================================================
 
 function CardChip() {
   return (
-    <div
-      aria-hidden="true"
-      className="grid h-[30px] w-[40px] grid-cols-3 gap-[2px] rounded p-1"
-      style={{ background: CHIP_GRADIENT }}
-    >
-      <div className="rounded-sm" style={{ background: CHIP_CELL_BG }} />
-      <div className="rounded-sm" style={{ background: CHIP_CELL_BG }} />
-      <div className="rounded-sm" style={{ background: CHIP_CELL_BG }} />
-      <div className="rounded-sm" style={{ background: CHIP_CELL_BG }} />
-      <div className="rounded-sm" style={{ background: CHIP_CELL_BG }} />
-      <div className="rounded-sm" style={{ background: CHIP_CELL_BG }} />
+    <div aria-hidden="true" className="relative">
+      <div className="flex h-12 w-14 items-center justify-center rounded-lg border border-border/60 bg-foreground/15 backdrop-blur">
+        <div className="h-8 w-10 rounded-md border border-border/40 bg-background/60" />
+      </div>
+      <div className="absolute right-0 -bottom-1 left-0 h-1 rounded-full bg-foreground/10" />
     </div>
   );
 }
@@ -144,6 +152,19 @@ export function CardVault({
   countdownDuration = 60_000,
   onCountdownExpire,
 }: CardVaultProps) {
+  // 3D mouse-tracking hooks (must be before any conditional return)
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [6, -6]), {
+    stiffness: 280,
+    damping: 28,
+  });
+  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-6, 6]), {
+    stiffness: 280,
+    damping: 28,
+  });
+  const shouldReduceMotion = useReducedMotion();
+
   // Track duplicate tap attempts for subtle feedback (AC#4)
   // Counter changes the announcement text, triggering aria-live to re-announce
   const duplicateTapCountRef = { current: 0 };
@@ -171,6 +192,21 @@ export function CardVault({
       duplicateTapCountRef.current = 0;
       onUnlockRequest?.();
     }
+  }
+
+  // Mouse handlers for 3D card rotation effect
+  function handleCardMouseMove(event: MouseEvent<HTMLDivElement>) {
+    if (shouldReduceMotion) {
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    mouseX.set((event.clientX - rect.left) / rect.width - 0.5);
+    mouseY.set((event.clientY - rect.top) / rect.height - 0.5);
+  }
+
+  function handleCardMouseLeave() {
+    mouseX.set(0);
+    mouseY.set(0);
   }
 
   // Empty state: no card linked
@@ -211,10 +247,6 @@ export function CardVault({
     <div
       aria-busy={isActive && !isRevealed}
       aria-label={ariaLabel}
-      // TODO(Story 2.6 AC#2): Pulse animation currently stops abruptly when isActive
-      // becomes false. --duration-pulse-fade (300ms) token exists in tokens.css but
-      // requires a CSS transition on an opacity wrapper to fade the keyframe animation
-      // gracefully. CSS animations cannot be smoothly stopped via transitions alone.
       className={cn(
         "relative mx-auto w-full max-w-[28rem] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isActive && "animate-guardian-pulse",
@@ -223,7 +255,7 @@ export function CardVault({
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role="button"
-      style={{ aspectRatio: "1.586" }}
+      style={{ aspectRatio: "1.586", perspective: "1000px" }}
       tabIndex={0}
     >
       {/* Screen reader live region for status announcements (UX-94) */}
@@ -231,71 +263,88 @@ export function CardVault({
         {liveAnnouncement}
       </div>
 
-      {/* Card surface */}
-      <div
-        className="absolute inset-0 overflow-hidden rounded-2xl"
+      {/* 3D card container with mouse-tracking rotation */}
+      <motion.div
+        className="absolute inset-0"
+        onMouseLeave={handleCardMouseLeave}
+        onMouseMove={handleCardMouseMove}
         style={{
-          background: "var(--card-bg)",
-          border: "1px solid var(--card-border)",
+          rotateX: shouldReduceMotion ? 0 : rotateX,
+          rotateY: shouldReduceMotion ? 0 : rotateY,
+          transformStyle: "preserve-3d",
         }}
       >
-        {/* Card content: chip, last 4 digits, nickname */}
-        <div className="relative z-10 flex h-full flex-col justify-between p-6">
-          <CardChip />
-          <div className="flex items-end justify-between">
-            {/* Last 4 digits - opacity-80 ensures visibility through frost blur while maintaining subtle effect */}
-            <span
-              className="text-xl opacity-80"
-              style={{ fontFamily: "var(--font-data)" }}
-            >
-              •••• •••• •••• {card.lastFour}
-            </span>
-            {/* Card nickname */}
-            <span
-              className="text-muted-foreground text-sm"
-              style={{ fontFamily: "var(--font-conversation)" }}
-            >
-              {card.nickname ?? "My Card"}
-            </span>
-          </div>
-        </div>
+        {/* Shadow glow behind card */}
+        <div className="absolute inset-2 rounded-2xl bg-primary/15 blur-3xl" />
 
-        {/* Frost overlay with opacity transition for reveal animation.
-            Per UX-42: Animation targets opacity not blur amount for 60fps guarantee.
-            backdrop-filter blur remains constant; opacity fades the overlay out.
-            data-revealed attribute set for external CSS targeting/testing (state managed via inline styles). */}
+        {/* Card surface with glassmorphism */}
         <div
-          className="pointer-events-none absolute inset-0"
-          data-frost-overlay
-          data-revealed={isRevealed || undefined}
-          style={
-            {
-              backdropFilter: "blur(var(--frost-blur))",
-              WebkitBackdropFilter: "blur(var(--frost-blur))",
-              opacity: "var(--frost-opacity)",
-              // Apply transition based on reveal type
-              // earned = 600ms ease-out-expo (warm snap), override = 350ms linear (mechanical)
-              // break_glass = matches override timing (immediate, no countdown)
-              transition:
-                revealType === "override" || revealType === "break_glass"
-                  ? "--frost-opacity var(--duration-reveal-override) linear"
-                  : "--frost-opacity var(--duration-reveal) var(--ease-out-expo)",
-              // Set frost-opacity based on revealed state
-              "--frost-opacity": isRevealed ? 0 : 1,
-            } as React.CSSProperties
-          }
-        />
-
-        {/* Countdown timer appears at card bottom after reveal (UX-76)
-            Shows executive function window before auto-relock.
-            Break glass reveals skip timer — emergency unlock, not time-limited (Story 2.6 AC#2). */}
-        {isRevealed && showCountdown && revealType !== "break_glass" && (
-          <CountdownTimer
-            durationMs={countdownDuration}
-            onExpire={onCountdownExpire}
+          className="absolute inset-0 overflow-hidden rounded-2xl"
+          style={{
+            background: CARD_GRADIENT,
+            border: "1px solid oklch(0.45 0.06 250)",
+            boxShadow:
+              "0 0 40px oklch(0.4 0.1 250 / 0.25), 0 0 80px oklch(0.35 0.08 250 / 0.12), inset 0 1px 0 oklch(1 0 0 / 0.06), 0 22px 55px -30px rgba(15,23,42,0.75)",
+          }}
+        >
+          {/* Overlay lights for glassmorphism depth */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-2xl"
+            style={{ background: OVERLAY_LIGHTS }}
           />
-        )}
-      </div>
+
+          {/* Card content: chip, last 4 digits, nickname */}
+          <div className="relative z-10 flex h-full flex-col justify-between p-6">
+            <CardChip />
+            <div className="flex items-end justify-between">
+              <span
+                className="font-mono text-xl tracking-[0.2em] opacity-80"
+                style={{ fontFamily: "var(--font-data)" }}
+              >
+                •••• •••• •••• {card.lastFour}
+              </span>
+              <span
+                className="text-muted-foreground text-sm"
+                style={{ fontFamily: "var(--font-conversation)" }}
+              >
+                {card.nickname ?? "My Card"}
+              </span>
+            </div>
+          </div>
+
+          {/* Frost overlay with opacity transition for reveal animation.
+              Per UX-42: Animation targets opacity not blur amount for 60fps guarantee.
+              backdrop-filter blur remains constant; opacity fades the overlay out. */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            data-frost-overlay
+            data-revealed={isRevealed || undefined}
+            style={
+              {
+                backdropFilter: "blur(var(--frost-blur))",
+                WebkitBackdropFilter: "blur(var(--frost-blur))",
+                opacity: "var(--frost-opacity)",
+                transition:
+                  revealType === "override" || revealType === "break_glass"
+                    ? "--frost-opacity var(--duration-reveal-override) linear"
+                    : "--frost-opacity var(--duration-reveal) var(--ease-out-expo)",
+                "--frost-opacity": isRevealed ? 0 : 1,
+              } as React.CSSProperties
+            }
+          />
+
+          {/* Countdown timer appears at card bottom after reveal (UX-76)
+              Shows executive function window before auto-relock.
+              Break glass reveals skip timer — emergency unlock, not time-limited (Story 2.6 AC#2). */}
+          {isRevealed && showCountdown && revealType !== "break_glass" && (
+            <CountdownTimer
+              durationMs={countdownDuration}
+              onExpire={onCountdownExpire}
+            />
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }

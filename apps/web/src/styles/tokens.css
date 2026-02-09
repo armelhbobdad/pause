@@ -79,6 +79,13 @@
   --guardian-error-bg: oklch(0.95 0.03 22);
   --duration-pulse-fade: 300ms;
 
+  /* Auto-Relock Timer (Story 9.4)
+     ADR: oklch colors for perceptual uniformity; green→yellow→red depletion */
+  --relock-green: oklch(0.72 0.18 145);
+  --relock-yellow: oklch(0.78 0.16 85);
+  --relock-red: oklch(0.65 0.22 25);
+  --relock-bar-height: 3px;
+
   /* Typography
      ADR: Geist Sans is Next.js default; JetBrains Mono for data/codes
      Note: Uses CSS variables from next/font/google loaded in layout.tsx */
@@ -86,6 +93,81 @@
     var(--font-geist-sans), "Geist Sans", system-ui, sans-serif;
   --font-data:
     var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+
+  /* ==========================================================================
+   * Pause Design Tokens (Epic 10 — Purification)
+   * Token migration: ADDITIVE ONLY — no renaming/removal of existing tokens
+   * All colors use oklch() for perceptual uniformity
+   * ========================================================================== */
+
+  /* Guardian State Colors */
+  --pause-active: oklch(0.8 0.15 80);
+  --pause-success: oklch(0.6 0.2 145);
+  --pause-glass: oklch(1 0 0 / 5%);
+  --pause-scrim: oklch(0 0 0 / 60%);
+
+  /* Blur Tokens */
+  --pause-blur-heavy: 20px;
+  --pause-blur-medium: 10px;
+  --pause-blur-light: 5px;
+
+  /* Timing Tokens */
+  --pause-timing-breathe: 4s;
+  --pause-timing-ripple: 600ms;
+  --pause-timing-glow: 1200ms;
+  --pause-timing-collapse: 400ms;
+  --pause-timing-reveal: 1500ms;
+
+  /* Transition Tokens */
+  --pause-transition-fast: 150ms;
+  --pause-transition-normal: 250ms;
+
+  /* Z-Index Tokens */
+  --z-base: 0;
+  --z-card: 10;
+  --z-float: 100;
+  --z-overlay: 200;
+  --z-toast: 300;
+  --z-tooltip: 400;
+
+  /* Elevation Border Tokens */
+  --pause-border-base: oklch(1 0 0 / 10%);
+  --pause-border-elevated: oklch(1 0 0 / 15%);
+  --pause-border-modal: oklch(1 0 0 / 20%);
+
+  /* Spacing Tokens */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ==========================================================================
+   * Visual Rebrand Tokens (UI/UX Overhaul)
+   * Cool-blue accent system for luxury fintech aesthetic
+   * ========================================================================== */
+
+  /* Accent Glow (interactive highlights) */
+  --accent-glow: oklch(0.75 0.15 250);
+  --accent-glow-subtle: oklch(0.85 0.08 250);
+
+  /* Hero Gradient (landing page headline) */
+  --hero-gradient-start: oklch(0.85 0.12 250);
+  --hero-gradient-mid: oklch(0.8 0.14 280);
+  --hero-gradient-end: oklch(0.9 0.1 200);
+
+  /* Elevated Surfaces */
+  --surface-elevated: oklch(0.18 0.01 250);
+  --surface-hover: oklch(0.22 0.015 250);
+
+  /* Text Hierarchy */
+  --text-hero: oklch(0.97 0.005 250);
+  --text-secondary: oklch(0.7 0.02 250);
 }
 
 /* Shimmer Loading Animation (Story 4.4, AC#5)
@@ -156,5 +238,121 @@
   [data-celebrate] {
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
+  }
+}
+
+/* Backdrop-filter fallback (Story 10.1, AC#1)
+   For browsers that don't support backdrop-filter */
+@supports not (backdrop-filter: blur(10px)) {
+  .glass-panel,
+  .card-vault,
+  [data-glass] {
+    background: linear-gradient(
+      135deg,
+      oklch(0.15 0.02 250 / 95%),
+      oklch(0.12 0.01 250 / 98%)
+    );
+    border-color: oklch(1 0 0 / 20%);
+  }
+}
+
+/* High contrast mode support (Story 10.1, AC#1)
+   Ensures interactive elements remain visible in forced-colors mode */
+/* Focused Mode — navbar items dimmed during active Guardian session (Story 10.5) */
+[data-navbar].focused-mode a {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Landing Page Card Preview Breathing Animation (Story 10.4)
+   CSS-only approach mandated for parallel worktree safety with Story 10.2.
+   Uses --pause-timing-breathe (4s) for visual continuity with dashboard card. */
+@keyframes card-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-card-breathe {
+    animation: none !important;
+  }
+}
+
+/* Visual Silence — CSS-only narrowing during Therapist reflection (Story 10.5, AC#10)
+   No DOM changes — sibling elements hidden via CSS adjacent sibling combinator */
+.visual-silence {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.visual-silence ~ * {
+  display: none;
+}
+
+/* Tabular nums utility — monospaced digits for counters (Story 10.5, AC#15) */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hero Shimmer — Subtle gradient sweep for hero text (Visual Rebrand) */
+@keyframes hero-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Fade In Up — Staggered reveal for content sections (Visual Rebrand) */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Vault Glow — Ambient card glow pulse (Visual Rebrand) */
+@keyframes vault-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 30px oklch(0.75 0.15 250 / 0.08);
+  }
+  50% {
+    box-shadow: 0 0 50px oklch(0.75 0.15 250 / 0.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-gradient-hero,
+  .vault-glow,
+  [data-hero-animate] {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .card,
+  .glass-panel,
+  .card-vault,
+  button,
+  a {
+    border: 1px solid ButtonText;
   }
 }

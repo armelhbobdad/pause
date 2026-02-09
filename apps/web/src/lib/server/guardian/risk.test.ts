@@ -62,7 +62,7 @@ import type {
   RiskAssessmentResult,
   RiskFactor,
 } from "./risk";
-import { assessRisk } from "./risk";
+import { assessRisk, detectCategoryFromText, parsePriceFromText } from "./risk";
 
 describe("Risk Assessment Engine", () => {
   beforeEach(() => {
@@ -218,72 +218,115 @@ describe("Risk Assessment Engine", () => {
       });
     });
 
-    // Price signal (AC#3)
-    describe("price signal (AC#3)", () => {
-      it("adds +20 for high price >$100", async () => {
+    // Price signals (AC#3)
+    describe("price signals (AC#3)", () => {
+      it("adds +20 for medium price ($50-$199)", async () => {
         const result = await assessRisk({
           userId: "user-1",
           cardId: "card-1",
-          priceInCents: 10_001,
+          priceInCents: 7900,
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        const priceFactor = result.factors.find(
+          (f) => f.signal === "medium_price"
+        );
+        expect(priceFactor).toBeDefined();
+        expect(priceFactor?.points).toBe(20);
+      });
+
+      it("adds +60 for high price ($200-$999)", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          priceInCents: 25_000,
           now: new Date("2026-02-06T12:00:00Z"),
         });
         const priceFactor = result.factors.find(
           (f) => f.signal === "high_price"
         );
         expect(priceFactor).toBeDefined();
+        expect(priceFactor?.points).toBe(60);
+      });
+
+      it("adds +75 for very high price ($1000+)", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          priceInCents: 120_000,
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        const priceFactor = result.factors.find(
+          (f) => f.signal === "very_high_price"
+        );
+        expect(priceFactor).toBeDefined();
+        expect(priceFactor?.points).toBe(75);
+      });
+
+      it("does NOT add price factor at exactly $49.99 (below medium threshold)", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          priceInCents: 4999,
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        const anyPriceFactor = result.factors.find((f) =>
+          f.signal.includes("price")
+        );
+        expect(anyPriceFactor).toBeUndefined();
+      });
+
+      it("adds medium_price at exactly $50", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          priceInCents: 5000,
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        const priceFactor = result.factors.find(
+          (f) => f.signal === "medium_price"
+        );
+        expect(priceFactor).toBeDefined();
         expect(priceFactor?.points).toBe(20);
       });
 
-      it("does NOT add price factor at exactly $100 (boundary)", async () => {
+      it("switches to high_price at $200", async () => {
         const result = await assessRisk({
           userId: "user-1",
           cardId: "card-1",
-          priceInCents: 10_000,
-          now: new Date("2026-02-06T12:00:00Z"),
-        });
-        const priceFactor = result.factors.find(
-          (f) => f.signal === "high_price"
-        );
-        expect(priceFactor).toBeUndefined();
-      });
-
-      it("does NOT add price factor at $99.99", async () => {
-        const result = await assessRisk({
-          userId: "user-1",
-          cardId: "card-1",
-          priceInCents: 9999,
-          now: new Date("2026-02-06T12:00:00Z"),
-        });
-        const priceFactor = result.factors.find(
-          (f) => f.signal === "high_price"
-        );
-        expect(priceFactor).toBeUndefined();
-      });
-
-      it("adds +20 at $100.01", async () => {
-        const result = await assessRisk({
-          userId: "user-1",
-          cardId: "card-1",
-          priceInCents: 10_001,
+          priceInCents: 20_000,
           now: new Date("2026-02-06T12:00:00Z"),
         });
         const priceFactor = result.factors.find(
           (f) => f.signal === "high_price"
         );
         expect(priceFactor).toBeDefined();
-        expect(priceFactor?.points).toBe(20);
+        expect(priceFactor?.points).toBe(60);
       });
 
-      it("does NOT add price factor when priceInCents is undefined", async () => {
+      it("switches to very_high_price at $1000", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          priceInCents: 100_000,
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        const priceFactor = result.factors.find(
+          (f) => f.signal === "very_high_price"
+        );
+        expect(priceFactor).toBeDefined();
+        expect(priceFactor?.points).toBe(75);
+      });
+
+      it("does NOT add price factor when priceInCents is undefined and no purchaseContext", async () => {
         const result = await assessRisk({
           userId: "user-1",
           cardId: "card-1",
           now: new Date("2026-02-06T12:00:00Z"),
         });
-        const priceFactor = result.factors.find(
-          (f) => f.signal === "high_price"
+        const anyPriceFactor = result.factors.find((f) =>
+          f.signal.includes("price")
         );
-        expect(priceFactor).toBeUndefined();
+        expect(anyPriceFactor).toBeUndefined();
       });
     });
 
@@ -324,6 +367,8 @@ describe("Risk Assessment Engine", () => {
         "jewelry",
         "food_delivery",
         "subscription",
+        "entertainment",
+        "travel",
       ])("recognizes impulse category: %s", async (category) => {
         const result = await assessRisk({
           userId: "user-1",
@@ -351,7 +396,7 @@ describe("Risk Assessment Engine", () => {
         expect(catFactor).toBeUndefined();
       });
 
-      it("does NOT add category factor when category is undefined", async () => {
+      it("does NOT add category factor when category is undefined and no purchaseContext", async () => {
         const result = await assessRisk({
           userId: "user-1",
           cardId: "card-1",
@@ -367,12 +412,10 @@ describe("Risk Assessment Engine", () => {
     // Score clamping (AC#5)
     describe("score clamping (AC#5)", () => {
       it("clamps score to maximum 100", async () => {
-        // All signals active: time(15) + price(20) + category(10) + max overrides(25) = 70
-        // Not enough to exceed 100 with context-only, but test with history
         const result = await assessRisk({
           userId: "user-1",
           cardId: "card-1",
-          priceInCents: 50_000,
+          priceInCents: 120_000,
           category: "electronics",
           now: new Date("2026-02-06T02:00:00Z"),
         });
@@ -399,7 +442,7 @@ describe("Risk Assessment Engine", () => {
         const result = await assessRisk({
           userId: "user-1",
           cardId: "card-1",
-          priceInCents: 15_000,
+          priceInCents: 25_000,
           category: "electronics",
           now: new Date("2026-02-06T23:00:00Z"),
         });
@@ -522,7 +565,7 @@ describe("Risk Assessment Engine", () => {
         const result = await assessRisk({
           userId: "user-1",
           cardId: "card-1",
-          priceInCents: 15_000,
+          priceInCents: 25_000,
           now: new Date("2026-02-06T23:00:00Z"),
         });
         expect(result.historyAvailable).toBe(false);
@@ -553,15 +596,15 @@ describe("Risk Assessment Engine", () => {
   // ========================================================================
 
   describe("combined scenarios", () => {
-    it("combines all context signals: time(15) + price(20) + category(10) = 45", async () => {
+    it("combines time(15) + high_price(60) + category(10) = 85", async () => {
       const result = await assessRisk({
         userId: "user-1",
         cardId: "card-1",
-        priceInCents: 15_000,
+        priceInCents: 25_000,
         category: "electronics",
         now: new Date("2026-02-06T23:00:00Z"),
       });
-      expect(result.score).toBe(45);
+      expect(result.score).toBe(85);
     });
 
     it("combines context + history signals", async () => {
@@ -572,12 +615,12 @@ describe("Risk Assessment Engine", () => {
       const result = await assessRisk({
         userId: "user-1",
         cardId: "card-1",
-        priceInCents: 15_000,
+        priceInCents: 25_000,
         category: "electronics",
         now: new Date("2026-02-06T23:00:00Z"),
       });
-      // time(15) + price(20) + category(10) + overrides(10) = 55
-      expect(result.score).toBe(55);
+      // time(15) + high_price(60) + category(10) + overrides(10) = 95
+      expect(result.score).toBe(95);
     });
 
     it("default now parameter uses current time (AC#15)", async () => {
@@ -588,6 +631,182 @@ describe("Risk Assessment Engine", () => {
       });
       expect(result.score).toBeGreaterThanOrEqual(0);
       expect(result.score).toBeLessThanOrEqual(100);
+    });
+  });
+
+  // ========================================================================
+  // Purchase context text parsing
+  // ========================================================================
+
+  describe("parsePriceFromText", () => {
+    it("extracts dollar amount from 'Bluetooth speaker - $79'", () => {
+      expect(parsePriceFromText("Bluetooth speaker - $79")).toBe(7900);
+    });
+
+    it("extracts dollar amount with cents", () => {
+      expect(parsePriceFromText("Coffee - $12.50")).toBe(1250);
+    });
+
+    it("extracts dollar amount with commas", () => {
+      expect(parsePriceFromText("Laptop - $1,200")).toBe(120_000);
+    });
+
+    it("returns undefined for no price", () => {
+      expect(parsePriceFromText("Some random text")).toBeUndefined();
+    });
+
+    it("returns undefined for $0", () => {
+      expect(parsePriceFromText("Free item - $0")).toBeUndefined();
+    });
+
+    it("extracts from 'Designer shoes - $250'", () => {
+      expect(parsePriceFromText("Designer shoes - $250")).toBe(25_000);
+    });
+
+    it("extracts from '$12/month' format", () => {
+      expect(parsePriceFromText("Coffee subscription - $12/month")).toBe(1200);
+    });
+  });
+
+  describe("detectCategoryFromText", () => {
+    it("detects electronics from 'Bluetooth speaker'", () => {
+      expect(detectCategoryFromText("Bluetooth speaker - $79")).toBe(
+        "electronics"
+      );
+    });
+
+    it("detects luxury from 'Designer shoes'", () => {
+      expect(detectCategoryFromText("Designer shoes - $250")).toBe("luxury");
+    });
+
+    it("detects gaming from 'Gaming mouse'", () => {
+      expect(detectCategoryFromText("Gaming mouse - $65")).toBe("gaming");
+    });
+
+    it("detects luxury from 'Designer handbag'", () => {
+      expect(detectCategoryFromText("Designer handbag - $2,000")).toBe(
+        "luxury"
+      );
+    });
+
+    it("detects entertainment from 'Concert VIP tickets'", () => {
+      expect(detectCategoryFromText("Concert VIP tickets - $300")).toBe(
+        "entertainment"
+      );
+    });
+
+    it("detects travel from 'Spontaneous vacation booking'", () => {
+      expect(detectCategoryFromText("Spontaneous vacation booking")).toBe(
+        "travel"
+      );
+    });
+
+    it("detects subscription from 'Coffee subscription'", () => {
+      expect(detectCategoryFromText("Coffee subscription - $12/month")).toBe(
+        "subscription"
+      );
+    });
+
+    it("returns undefined for unrecognized text", () => {
+      expect(detectCategoryFromText("Grocery run - $45")).toBeUndefined();
+    });
+  });
+
+  describe("purchase context integration", () => {
+    it("parses price and category from purchaseContext text", async () => {
+      const result = await assessRisk({
+        userId: "user-1",
+        cardId: "card-1",
+        purchaseContext: "Bluetooth speaker - $79",
+        now: new Date("2026-02-06T12:00:00Z"),
+      });
+      // medium_price(20) + electronics(10) = 30
+      expect(result.score).toBe(30);
+      expect(result.factors).toHaveLength(2);
+    });
+
+    it("explicit priceInCents overrides text parsing", async () => {
+      const result = await assessRisk({
+        userId: "user-1",
+        cardId: "card-1",
+        priceInCents: 100,
+        purchaseContext: "Laptop - $1,200",
+        now: new Date("2026-02-06T12:00:00Z"),
+      });
+      // Explicit $1 price (no signal) + electronics from text(10) = 10
+      const anyPriceFactor = result.factors.find((f) =>
+        f.signal.includes("price")
+      );
+      expect(anyPriceFactor).toBeUndefined();
+    });
+
+    it("explicit category overrides text parsing", async () => {
+      const result = await assessRisk({
+        userId: "user-1",
+        cardId: "card-1",
+        category: "groceries",
+        purchaseContext: "Bluetooth speaker - $79",
+        now: new Date("2026-02-06T12:00:00Z"),
+      });
+      // groceries is not impulse → no category signal; medium_price(20) only
+      const catFactor = result.factors.find(
+        (f) => f.signal === "impulse_category"
+      );
+      expect(catFactor).toBeUndefined();
+    });
+
+    // Demo guide tier verification
+    describe("demo guide tier mapping", () => {
+      it("Coffee subscription $12 → Analyst (score < 30)", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          purchaseContext: "Coffee subscription - $12/month",
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        expect(result.score).toBeLessThan(30);
+      });
+
+      it("Bluetooth speaker $79 → Negotiator (score 30-69)", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          purchaseContext: "Bluetooth speaker - $79",
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        expect(result.score).toBeGreaterThanOrEqual(30);
+        expect(result.score).toBeLessThan(70);
+      });
+
+      it("Designer shoes $250 → Therapist (score >= 70)", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          purchaseContext: "Designer shoes - $250",
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        expect(result.score).toBeGreaterThanOrEqual(70);
+      });
+
+      it("New laptop $1,200 → Therapist + Wizard (score >= 85)", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          purchaseContext: "New laptop - $1,200",
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        expect(result.score).toBeGreaterThanOrEqual(85);
+      });
+
+      it("Grocery run $45 → Analyst (no impulse category)", async () => {
+        const result = await assessRisk({
+          userId: "user-1",
+          cardId: "card-1",
+          purchaseContext: "Grocery run - $45",
+          now: new Date("2026-02-06T12:00:00Z"),
+        });
+        expect(result.score).toBeLessThan(30);
+      });
     });
   });
 });

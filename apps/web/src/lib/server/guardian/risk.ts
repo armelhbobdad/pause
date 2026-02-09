@@ -44,19 +44,182 @@ const IMPULSE_CATEGORIES = new Set([
   "jewelry",
   "food_delivery",
   "subscription",
+  "entertainment",
+  "travel",
 ]);
 
 const HISTORY_QUERY_TIMEOUT_MS = 5000;
 
 // ============================================================================
+// Purchase context parsing
+// ============================================================================
+
+const PRICE_REGEX = /\$[\s]*([\d,]+(?:\.\d{1,2})?)/;
+
+/** Extract dollar amount from free-text purchase description. */
+export function parsePriceFromText(text: string): number | undefined {
+  const match = PRICE_REGEX.exec(text);
+  if (!match?.[1]) {
+    return undefined;
+  }
+  const dollars = Number.parseFloat(match[1].replace(/,/g, ""));
+  if (Number.isNaN(dollars) || dollars <= 0) {
+    return undefined;
+  }
+  return Math.round(dollars * 100);
+}
+
+// Order matters: more specific categories first to prevent false matches.
+// E.g., "gaming" must precede "electronics" so "Gaming mouse" → gaming, not electronics.
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  luxury: ["designer", "luxury", "gucci", "rolex", "premium", "brand"],
+  gaming: [
+    "gaming",
+    "playstation",
+    "xbox",
+    "nintendo",
+    "console",
+    "controller",
+  ],
+  electronics: [
+    "speaker",
+    "laptop",
+    "phone",
+    "computer",
+    "headphone",
+    "earbud",
+    "tablet",
+    "monitor",
+    "keyboard",
+    "mouse",
+    "iphone",
+    "ipad",
+    "macbook",
+    "tv",
+    "television",
+    "camera",
+    "drone",
+    "airpods",
+    "smartwatch",
+    "charger",
+    "bluetooth",
+  ],
+  fashion: [
+    "shoes",
+    "sneaker",
+    "dress",
+    "jacket",
+    "coat",
+    "shirt",
+    "pants",
+    "jeans",
+    "handbag",
+    "purse",
+    "backpack",
+    "boots",
+    "clothing",
+    "outfit",
+    "hoodie",
+    "sunglasses",
+    "hat",
+  ],
+  jewelry: [
+    "ring",
+    "necklace",
+    "bracelet",
+    "earring",
+    "diamond",
+    "gold",
+    "silver",
+    "watch",
+  ],
+  entertainment: [
+    "concert",
+    "tickets",
+    "festival",
+    "movie",
+    "show",
+    "event",
+    "vip",
+    "theater",
+  ],
+  travel: [
+    "vacation",
+    "flight",
+    "hotel",
+    "booking",
+    "trip",
+    "airbnb",
+    "cruise",
+    "resort",
+  ],
+  subscription: ["subscription", "membership", "monthly plan", "annual plan"],
+  food_delivery: ["doordash", "uber eats", "grubhub", "takeout", "delivery"],
+};
+
+/** Detect impulse category from free-text purchase description. */
+export function detectCategoryFromText(text: string): string | undefined {
+  const lower = text.toLowerCase();
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    for (const keyword of keywords) {
+      if (lower.includes(keyword)) {
+        return category;
+      }
+    }
+  }
+  return undefined;
+}
+
+// ============================================================================
 // Risk Assessment (AC#1-13, #15)
 // ============================================================================
+
+/** Score a purchase price into tiered risk factor. */
+function scorePriceFactor(priceInCents: number): RiskFactor | undefined {
+  const dollars = (priceInCents / 100).toFixed(2);
+  if (priceInCents >= 100_000) {
+    return {
+      signal: "very_high_price",
+      points: 75,
+      description: `very high price $${dollars} (+75)`,
+    };
+  }
+  if (priceInCents >= 20_000) {
+    return {
+      signal: "high_price",
+      points: 60,
+      description: `high price $${dollars} (+60)`,
+    };
+  }
+  if (priceInCents >= 5000) {
+    return {
+      signal: "medium_price",
+      points: 20,
+      description: `medium price $${dollars} (+20)`,
+    };
+  }
+  return undefined;
+}
 
 export async function assessRisk(
   input: RiskAssessmentInput
 ): Promise<RiskAssessmentResult> {
   const now = input.now ?? new Date();
   const factors: RiskFactor[] = [];
+
+  // --- Resolve price and category from explicit params or text parsing ---
+
+  const priceInCents =
+    input.priceInCents ??
+    (input.purchaseContext
+      ? parsePriceFromText(input.purchaseContext)
+      : undefined);
+
+  const category =
+    input.category ??
+    (input.purchaseContext
+      ? detectCategoryFromText(input.purchaseContext)
+      : undefined);
 
   // --- Context signals (always available) ---
 
@@ -70,22 +233,20 @@ export async function assessRisk(
     });
   }
 
-  // Price signal (AC#3): +20 for >$100 (>10000 cents)
-  if (input.priceInCents !== undefined && input.priceInCents > 10_000) {
-    const dollars = (input.priceInCents / 100).toFixed(2);
-    factors.push({
-      signal: "high_price",
-      points: 20,
-      description: `high price $${dollars} (+20)`,
-    });
+  // Price signals (AC#3): tiered scoring based on amount
+  if (priceInCents !== undefined) {
+    const priceFactor = scorePriceFactor(priceInCents);
+    if (priceFactor) {
+      factors.push(priceFactor);
+    }
   }
 
   // Category signal (AC#4): +10 for impulse categories
-  if (input.category && IMPULSE_CATEGORIES.has(input.category.toLowerCase())) {
+  if (category && IMPULSE_CATEGORIES.has(category.toLowerCase())) {
     factors.push({
       signal: "impulse_category",
       points: 10,
-      description: `impulse category: ${input.category.toLowerCase()} (+10)`,
+      description: `impulse category: ${category.toLowerCase()} (+10)`,
     });
   }
 

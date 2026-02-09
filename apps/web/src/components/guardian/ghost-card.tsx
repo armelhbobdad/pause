@@ -321,15 +321,21 @@ export function GhostCard({
     onSatisfactionFeedback?.(null);
   };
 
+  const tierBorderColors: Record<string, string> = {
+    negotiator: "var(--savings-gold)",
+    therapist: "var(--therapist-amber)",
+  };
+  const tierBorderColor = tierBorderColors[tierOrigin] ?? "var(--card-border)";
+
   return (
     <article
       aria-label={`Past spending: ${recall}`}
       aria-live={isFeedbackGiven ? "polite" : undefined}
+      className="glass-card"
       data-ghost-id={id}
       ref={cardRef}
       style={{
-        backgroundColor: "var(--card-bg)",
-        border: "1px solid var(--card-border)",
+        borderLeft: `3px solid ${tierBorderColor}`,
         borderRadius: "0.5rem",
         padding: "1rem",
         filter: isFrosted ? "blur(var(--frost-blur))" : "blur(0px)",

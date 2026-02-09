@@ -5,7 +5,53 @@ import { protectedProcedure, router } from "../index";
 
 const { card, interaction, savings } = schema;
 
+const DEFAULT_LAST_FOUR = "4242";
+const HIGH_RISK_SCORE = 70;
+const RECENT_LIMIT = 10;
+const DEFAULT_THRESHOLD = 3;
+
+function getReferralThreshold(): number {
+  const envVal = process.env.REFERRAL_THRESHOLD;
+  if (envVal) {
+    const parsed = Number.parseInt(envVal, 10);
+    if (!Number.isNaN(parsed) && parsed >= 1) {
+      return parsed;
+    }
+  }
+  return DEFAULT_THRESHOLD;
+}
+
 export const dashboardRouter = router({
+  /** Fetch user's active card, auto-provisioning one if none exists. */
+  getCard: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+
+    const [existing] = await db
+      .select()
+      .from(card)
+      .where(and(eq(card.userId, userId), eq(card.status, "active")))
+      .limit(1);
+
+    if (existing) {
+      return existing;
+    }
+
+    // Auto-provision a card for new users (hackathon demo convenience)
+    const newCard = {
+      id: crypto.randomUUID(),
+      userId,
+      lastFour: DEFAULT_LAST_FOUR,
+      nickname: null,
+      status: "active" as const,
+      lockedAt: null,
+      unlockedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(card).values(newCard);
+    return newCard;
+  }),
+
   // NOTE: 4 sequential queries for readability. Consider combining with CTEs
   // if dashboard LCP exceeds NFR-P5 (1.5s) target under real load.
   summary: protectedProcedure.query(async ({ ctx }) => {
@@ -28,14 +74,16 @@ export const dashboardRouter = router({
       .innerJoin(interaction, eq(savings.interactionId, interaction.id))
       .where(and(eq(interaction.userId, userId), eq(savings.applied, true)));
 
-    // Acceptance rate: NULL propagation through round(NULL * 100) → NULL → cast NULL as float → null
+    // Acceptance rate: only decision outcomes in denominator (Story 9.5).
+    // Excludes abandoned, timeout, break_glass, wizard_bookmark, wizard_abandoned.
+    // NULL propagation through round(NULL * 100) → NULL → cast NULL as float → null
     // The ?? 0 fallback at return handles the all-null-outcomes edge case safely.
     const [acceptanceRateResult] = await db
       .select({
         rate: sql<number>`cast(
           round(
             count(*) filter (where ${interaction.outcome} in ('accepted', 'wait', 'auto_approved'))::numeric
-            / nullif(count(*) filter (where ${interaction.outcome} is not null), 0)
+            / nullif(count(*) filter (where ${interaction.outcome} in ('accepted', 'overridden', 'wait', 'auto_approved')), 0)
             * 100, 1
           ) as float
         )`,
@@ -67,6 +115,41 @@ export const dashboardRouter = router({
       totalSavedCents: totalSavedResult?.totalCents ?? 0,
       acceptanceRate: acceptanceRateResult?.rate ?? 0,
       recentInteractions,
+    };
+  }),
+
+  referralStatus: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+
+    const recentInteractions = await db
+      .select({
+        outcome: interaction.outcome,
+        riskScore: interaction.riskScore,
+      })
+      .from(interaction)
+      .where(eq(interaction.userId, userId))
+      .orderBy(desc(interaction.createdAt))
+      .limit(RECENT_LIMIT);
+
+    let consecutiveOverrides = 0;
+
+    for (const row of recentInteractions) {
+      if (
+        row.outcome === "overridden" &&
+        row.riskScore !== null &&
+        row.riskScore >= HIGH_RISK_SCORE
+      ) {
+        consecutiveOverrides++;
+      } else {
+        break;
+      }
+    }
+
+    const threshold = getReferralThreshold();
+
+    return {
+      shouldShow: consecutiveOverrides >= threshold,
+      consecutiveOverrides,
     };
   }),
 });

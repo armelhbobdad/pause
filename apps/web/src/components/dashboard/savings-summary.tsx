@@ -25,7 +25,11 @@ export function SavingsSummary({
   const isEmpty = totalSavedCents === 0 && interactionCount === 0;
 
   return (
-    <Card aria-label="Total savings" className="rounded-2xl p-4" role="region">
+    <Card
+      aria-label="Total savings"
+      className="glass-card rounded-2xl p-4"
+      role="region"
+    >
       <CardContent className="flex flex-col gap-2 p-0">
         <span
           className="font-bold text-savings"

@@ -1,8 +1,7 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { OverrideButton } from "@/components/guardian/override-button";
-import { Button } from "@/components/ui/button";
+import { NativeButton } from "@/components/uitripled/native-button-shadcnui";
 import type { InteractionOutcome } from "@/lib/guardian/types";
 import { cn } from "@/lib/utils";
 
@@ -76,17 +75,15 @@ export function InterventionActions({
   return (
     <div className={cn("flex items-center justify-center gap-3", className)}>
       {/* Primary action: Guardian's recommendation (left) */}
-      <Button
+      <NativeButton
         className="min-w-[120px]"
         disabled={isProcessing}
+        loading={isProcessing}
         onClick={handleAccept}
         variant="default"
       >
-        {isProcessing ? (
-          <Loader2 aria-hidden="true" className="animate-spin" />
-        ) : null}
         {acceptLabel}
-      </Button>
+      </NativeButton>
 
       {/* Secondary action: User's autonomous decision (right) */}
       <OverrideButton

@@ -481,7 +481,12 @@ export function ToolPartsRenderer({
   onRevealApproved,
   onWait,
 }: ToolPartsRendererProps) {
-  const toolName = part.toolName as ToolName;
+  // Dynamic tool parts have `toolName`; static parts encode it in the `type`
+  // field as `"tool-{name}"`. Handle both to prevent assertNever crashes.
+  const toolName = (part.toolName ??
+    (part.type.startsWith("tool-")
+      ? part.type.slice("tool-".length)
+      : undefined)) as ToolName;
 
   // Terminal error states: tool failed or was denied
   if (part.state === "output-error" || part.state === "output-denied") {
@@ -516,7 +521,10 @@ export function ToolPartsRenderer({
   // Output available — render based on tool name
   switch (toolName) {
     case TOOL_NAMES.SEARCH_COUPONS: {
-      if (!isBestOffer(part.output)) {
+      // Tool execute returns { bestOffer, allResultsCount, selectionReasoning }
+      const couponOutput = part.output as Record<string, unknown> | undefined;
+      const bestOffer = couponOutput?.bestOffer;
+      if (!isBestOffer(bestOffer)) {
         return (
           <div data-tool-fallback="search_coupons">
             Savings data unavailable
@@ -525,7 +533,7 @@ export function ToolPartsRenderer({
       }
       return (
         <SavingsTicketContainer
-          bestOffer={part.output}
+          bestOffer={bestOffer}
           interactionId={interactionId}
           onRevealApproved={onRevealApproved}
         />
@@ -583,6 +591,10 @@ export function ToolPartsRenderer({
       );
     }
     default:
+      // Gracefully handle unknown tool names instead of crashing the UI
+      if (toolName === undefined) {
+        return null;
+      }
       return assertNever(toolName);
   }
 }

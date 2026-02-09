@@ -57,6 +57,11 @@ vi.mock("@pause/auth", () => ({
   },
 }));
 
+// --- Mock @pause/env/server ---
+vi.mock("@pause/env/server", () => ({
+  env: { DEMO_MODE: "false" },
+}));
+
 // --- Mock @pause/db ---
 vi.mock("@pause/db", () => {
   const selectChain = {
@@ -763,7 +768,7 @@ describe("Guardian Route Handler", () => {
         true,
         undefined,
         undefined,
-        undefined,
+        "test",
         expect.objectContaining({ strategy_id: "auto_approve" })
       );
     });
@@ -851,7 +856,7 @@ describe("Guardian Route Handler", () => {
         false,
         undefined,
         undefined,
-        undefined,
+        "test",
         expect.objectContaining({ strategy_id: "coupon_search" })
       );
     });
@@ -988,7 +993,7 @@ describe("Guardian Route Handler", () => {
         true,
         undefined,
         undefined,
-        undefined,
+        "test",
         expect.objectContaining({ strategy_id: "auto_approve" })
       );
     });
@@ -1010,7 +1015,7 @@ describe("Guardian Route Handler", () => {
         false,
         undefined,
         undefined,
-        undefined,
+        "test",
         expect.objectContaining({ strategy_id: "default" })
       );
     });
@@ -1499,6 +1504,7 @@ describe("Guardian Route Handler", () => {
       expect(updateReturn?.set).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: {
+            purchaseContext: "test",
             banned_terms_replaced: [
               { original: "addiction", replacement: "pattern" },
             ],

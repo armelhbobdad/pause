@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { NativeButton } from "@/components/uitripled/native-button-shadcnui";
 import { cn } from "@/lib/utils";
 
 // ============================================================================
@@ -35,13 +35,13 @@ export function OverrideButton({
   className,
 }: OverrideButtonProps) {
   return (
-    <Button
+    <NativeButton
       className={cn("border-muted-foreground/50", className)}
       disabled={disabled}
       onClick={onClick}
       variant="outline"
     >
       Unlock Anyway
-    </Button>
+    </NativeButton>
   );
 }

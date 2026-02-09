@@ -2,6 +2,7 @@ import { google } from "@ai-sdk/google";
 import { auth } from "@pause/auth";
 import { db } from "@pause/db";
 import { card, interaction } from "@pause/db/schema";
+import { env } from "@pause/env/server";
 import {
   convertToModelMessages,
   stepCountIs,
@@ -61,6 +62,38 @@ export const maxDuration = 30;
 
 const DB_TIMEOUT_MS = 10_000;
 
+function getDemoStreamOptions(): { temperature?: number; seed?: number } {
+  if (env.DEMO_MODE === "true") {
+    return { temperature: 0, seed: 42 };
+  }
+  return {};
+}
+
+function buildPrepareStep(
+  tier: InteractionTier,
+  riskScore: number
+): () => Record<string, unknown> {
+  return () => {
+    if (tier === "negotiator") {
+      return {
+        toolCallStreaming: true,
+        activeTools: [TOOL_NAMES.SEARCH_COUPONS],
+      };
+    }
+    if (tier === "therapist") {
+      const activeTools: import("@/lib/guardian/tool-names").ToolName[] = [
+        TOOL_NAMES.PRESENT_REFLECTION,
+        TOOL_NAMES.SHOW_WAIT_OPTION,
+      ];
+      if (riskScore >= 85) {
+        activeTools.push(TOOL_NAMES.PRESENT_WIZARD_OPTION);
+      }
+      return { toolCallStreaming: true, activeTools };
+    }
+    return {};
+  };
+}
+
 const requestSchema = z.object({
   messages: z
     .array(
@@ -72,6 +105,79 @@ const requestSchema = z.object({
   cardId: z.string().min(1),
   purchaseContext: z.string().max(500).optional(),
 });
+
+// Extract purchase text from a message object. Handles both UIMessage v6
+// `parts` array and legacy `content` string formats.
+function extractFirstUserText(
+  msg: Record<string, unknown>
+): string | undefined {
+  if (typeof msg.content === "string" && msg.content.trim()) {
+    return msg.content.trim().slice(0, 500);
+  }
+  if (Array.isArray(msg.parts)) {
+    for (const part of msg.parts) {
+      if (
+        part &&
+        typeof part === "object" &&
+        "type" in part &&
+        part.type === "text" &&
+        "text" in part &&
+        typeof part.text === "string" &&
+        part.text.trim()
+      ) {
+        return part.text.trim().slice(0, 500);
+      }
+    }
+  }
+  return undefined;
+}
+
+// Resolve purchaseContext: prefer explicit body field, fall back to first user message text.
+// The client sends the purchase description as the first chat message, not as a
+// separate body field, so we extract it here for risk assessment + model context.
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown stream failure";
+}
+
+// Write degradation outcome to DB after stream failure.
+async function writeDegradationOutcome(
+  interactionId: string,
+  outcome: "auto_approved" | "break_glass",
+  failureReason: string
+): Promise<void> {
+  try {
+    const label = outcome === "auto_approved" ? "analyst_only" : "break_glass";
+    await db
+      .update(interaction)
+      .set({
+        status: "completed",
+        outcome,
+        reasoningSummary: `System failure — ${label} fallback activated. Reason: ${failureReason}`,
+      })
+      .where(eq(interaction.id, interactionId));
+  } catch (updateError) {
+    console.error(
+      `[Guardian] Failed to update degraded interaction ${interactionId}:`,
+      updateError
+    );
+  }
+}
+
+function resolvePurchaseContext(
+  explicitContext: string | undefined,
+  messages: Record<string, unknown>[]
+): string | undefined {
+  if (explicitContext) {
+    return explicitContext;
+  }
+  const firstUserMsg = messages.find((m) => m.role === "user") as
+    | Record<string, unknown>
+    | undefined;
+  if (!firstUserMsg) {
+    return undefined;
+  }
+  return extractFirstUserText(firstUserMsg);
+}
 
 export async function POST(req: Request) {
   // Service health tracking — scaffold for Story 3.6 degradation ladder.
@@ -90,7 +196,12 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return new Response("Invalid request body", { status: 400 });
   }
-  const { messages, cardId, purchaseContext } = parsed.data;
+  const { messages, cardId } = parsed.data;
+
+  const purchaseContext = resolvePurchaseContext(
+    parsed.data.purchaseContext,
+    messages as unknown as Record<string, unknown>[]
+  );
 
   // --- Authorization: verify card ownership (AC#3) ---
   let userCard: { id: string; userId: string } | undefined;
@@ -127,8 +238,6 @@ export async function POST(req: Request) {
       userId: session.user.id,
       cardId,
       purchaseContext,
-      // priceInCents and category are NOT parsed from purchaseContext in this story.
-      // Pass undefined — future story or 3.3 can add structured extraction.
     });
   } catch {
     riskResult = {
@@ -218,31 +327,14 @@ export async function POST(req: Request) {
       model: google("gemini-2.5-flash"),
       system: systemPrompt,
       messages: modelMessages,
+      ...getDemoStreamOptions(),
       tools: {
         [TOOL_NAMES.SEARCH_COUPONS]: searchCouponsTool,
         [TOOL_NAMES.PRESENT_REFLECTION]: presentReflectionTool,
         [TOOL_NAMES.SHOW_WAIT_OPTION]: showWaitOptionTool,
         [TOOL_NAMES.PRESENT_WIZARD_OPTION]: presentWizardOptionTool,
       },
-      prepareStep: () => {
-        if (tier === "negotiator") {
-          return {
-            toolCallStreaming: true,
-            activeTools: [TOOL_NAMES.SEARCH_COUPONS],
-          };
-        }
-        if (tier === "therapist") {
-          const activeTools: import("@/lib/guardian/tool-names").ToolName[] = [
-            TOOL_NAMES.PRESENT_REFLECTION,
-            TOOL_NAMES.SHOW_WAIT_OPTION,
-          ];
-          if (riskResult.score >= 85) {
-            activeTools.push(TOOL_NAMES.PRESENT_WIZARD_OPTION);
-          }
-          return { toolCallStreaming: true, activeTools };
-        }
-        return {};
-      },
+      prepareStep: buildPrepareStep(tier, riskResult.score),
       stopWhen: stepCountIs(isAutoApproved ? 1 : 5),
       experimental_transform: createBannedTermFilter((replacements) => {
         bannedTermReplacements.push(...replacements);
@@ -260,7 +352,8 @@ export async function POST(req: Request) {
         purchaseContext,
         prediction
       ),
-      abortSignal: AbortSignal.timeout(10_000),
+      // Analyst auto-approves in ~1s; negotiator/therapist need multi-step tool calls
+      abortSignal: AbortSignal.timeout(isAutoApproved ? 10_000 : 25_000),
     });
 
     // --- after() callback for interaction completion (AC#9, #15, Task 4) ---
@@ -347,8 +440,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     serviceHealth.gemini = false;
-    const failureReason =
-      error instanceof Error ? error.message : "Unknown stream failure";
+    const failureReason = getErrorMessage(error);
     console.error(
       `[Guardian] Degradation activated for ${interactionId}: tier=${tier}, reason=${failureReason}`
     );
@@ -366,23 +458,9 @@ export async function POST(req: Request) {
     // --- Degradation Ladder (Story 3.6) ---
     // Level 1: Analyst-only fallback — risk assessment already completed
     if (tier === "analyst") {
-      after(async () => {
-        try {
-          await db
-            .update(interaction)
-            .set({
-              status: "completed",
-              outcome: "auto_approved",
-              reasoningSummary: `System failure — analyst_only fallback activated. Reason: ${failureReason}`,
-            })
-            .where(eq(interaction.id, interactionId));
-        } catch (updateError) {
-          console.error(
-            `[Guardian] Failed to update degraded interaction ${interactionId}:`,
-            updateError
-          );
-        }
-      });
+      after(() =>
+        writeDegradationOutcome(interactionId, "auto_approved", failureReason)
+      );
 
       return new Response("Looks good! Card unlocked.", {
         headers: {
@@ -395,23 +473,9 @@ export async function POST(req: Request) {
     }
 
     // Level 2: Break Glass — non-analyst tiers or risk assessment failed
-    after(async () => {
-      try {
-        await db
-          .update(interaction)
-          .set({
-            status: "completed",
-            outcome: "break_glass",
-            reasoningSummary: `System failure — break_glass fallback activated. Reason: ${failureReason}`,
-          })
-          .where(eq(interaction.id, interactionId));
-      } catch (updateError) {
-        console.error(
-          `[Guardian] Failed to update degraded interaction ${interactionId}:`,
-          updateError
-        );
-      }
-    });
+    after(() =>
+      writeDegradationOutcome(interactionId, "break_glass", failureReason)
+    );
 
     return new Response("", {
       headers: {
