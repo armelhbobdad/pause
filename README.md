@@ -13,7 +13,7 @@
   <strong>AI-powered financial guardian that helps you pause before impulse purchases.</strong>
 </p>
 
-Americans spend over **$5,400 per year** on impulse purchases. Most people regret these decisions within days. Pause intercepts the moment of temptation with a three-tier AI system — analyzing risk, negotiating savings, and prompting reflection — so you make spending decisions you won't regret.
+The average person makes **multiple impulse purchases every week** — and most regret them within days. Pause intercepts the moment of temptation with a three-tier AI system — analyzing risk, negotiating savings, and prompting reflection — so you make spending decisions you won't regret.
 
 > Built for the **Encode Club Hackathon** — Financial Health & Best Use of Opik categories.
 
@@ -41,15 +41,23 @@ graph TB
         CFG[config — Shared Config]
     end
 
+    subgraph "external services"
+        GEMINI[Google Gemini 2.5 Flash]
+        OPIK[Opik — Observability]
+        NEON[Neon PostgreSQL]
+    end
+
     WEB --> API
     WEB --> AUTH
     WEB --> DB
     WEB --> ACE
     WEB --> ENV
+    WEB --> GEMINI
+    WEB --> OPIK
     API --> AUTH
     API --> DB
     API --> ENV
-    DB --> ENV
+    DB --> NEON
     AUTH --> DB
     AUTH --> ENV
 ```
@@ -181,6 +189,16 @@ bun run db:push      # Push schema to database
 bun run db:studio    # Open Drizzle Studio
 bun test             # Run test suite
 ```
+
+## Acknowledgements
+
+- [**Encode Club**](https://www.encodeclub.com/programmes/comet-resolution-v2-hackathon) — For launching and organizing this hackathon
+- [**Better-T-Stack**](https://www.better-t-stack.dev/) — For the strong project foundation
+- [**Neon**](https://neon.com/) — For free-tier PostgreSQL credits
+- [**Vercel**](https://vercel.com/) — For free-tier hosting
+- [**Google DeepMind**](https://deepmind.google/) — For free-tier Gemini 2.5 Flash credits
+- [**Opik**](https://www.comet.com/site/products/opik/) — For free-tier observability platform credits
+- [**Kayba AI**](https://kayba.ai/) — For the [TypeScript port of the ACE framework](https://github.com/kayba-ai/ace-ts)
 
 ## License
 
