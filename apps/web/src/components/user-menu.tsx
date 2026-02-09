@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { LogOut, Mail } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "./ui/skeleton";
@@ -36,32 +36,22 @@ const itemVariants = {
 export default function UserMenu() {
   const { data: session, isPending } = authClient.useSession();
   const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
-
-  const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        close();
-      }
-    };
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        close();
+        setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [open, close]);
+  }, [open]);
 
   if (isPending) {
     return <Skeleton className="h-8 w-8 rounded-full" />;
@@ -92,7 +82,7 @@ export default function UserMenu() {
     .slice(0, 2);
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative">
       <button
         aria-expanded={open}
         aria-haspopup="menu"
@@ -110,96 +100,92 @@ export default function UserMenu() {
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            animate={shouldReduceMotion ? { opacity: 1 } : "visible"}
-            className="absolute right-0 z-50 mt-2 w-52 origin-top-right overflow-hidden rounded-xl border p-1"
-            exit={shouldReduceMotion ? { opacity: 0 } : "exit"}
-            initial={shouldReduceMotion ? { opacity: 0 } : "hidden"}
-            role="menu"
-            style={{
-              background: "oklch(0.13 0.008 250 / 90%)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              borderColor: "oklch(1 0 0 / 0.08)",
-              boxShadow:
-                "0 8px 32px oklch(0 0 0 / 0.4), 0 0 0 1px oklch(1 0 0 / 0.03)",
-            }}
-            variants={menuVariants}
-          >
-            {/* Header */}
-            <motion.div
-              className="flex items-center gap-2.5 px-3 py-2"
-              custom={0}
-              variants={shouldReduceMotion ? undefined : itemVariants}
-            >
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-full font-semibold text-[10px]"
-                style={{
-                  background: "oklch(0.3 0.05 250)",
-                  color: "oklch(0.8 0.08 250)",
-                }}
-              >
-                {initials}
-              </div>
-              <div>
-                <p className="font-medium text-[13px] leading-tight">
-                  {session.user.name}
-                </p>
-                <p
-                  className="text-[11px] leading-tight"
-                  style={{ color: "oklch(0.5 0.02 250)" }}
-                >
-                  Account
-                </p>
-              </div>
-            </motion.div>
-
+          <>
+            {/* Invisible backdrop to close menu on outside click */}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: presentation backdrop for click-outside */}
             <div
-              className="mx-2 my-1 h-px"
-              style={{ background: "oklch(1 0 0 / 0.06)" }}
-            />
-
-            {/* Email */}
-            <motion.div
-              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12px]"
-              custom={1}
-              role="menuitem"
-              style={{ color: "oklch(0.55 0.02 250)" }}
-              variants={shouldReduceMotion ? undefined : itemVariants}
-            >
-              <Mail className="h-3.5 w-3.5" />
-              <span className="truncate">{session.user.email}</span>
-            </motion.div>
-
-            {/* Sign Out */}
-            <motion.button
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors"
-              custom={2}
-              onClick={async () => {
-                try {
-                  await fetch("/api/auth/sign-out", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({}),
-                  });
-                } finally {
-                  window.location.href = "/";
+              className="fixed inset-0 z-40"
+              onClick={() => setOpen(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setOpen(false);
                 }
               }}
-              role="menuitem"
-              style={{ color: "oklch(0.65 0.14 25)" }}
-              type="button"
-              variants={shouldReduceMotion ? undefined : itemVariants}
-              whileHover={
-                shouldReduceMotion
-                  ? undefined
-                  : { x: 2, backgroundColor: "oklch(0.65 0.14 25 / 0.08)" }
-              }
+              role="presentation"
+            />
+            <motion.div
+              animate={shouldReduceMotion ? { opacity: 1 } : "visible"}
+              className="absolute right-0 z-50 mt-2 w-52 origin-top-right overflow-hidden rounded-xl border p-1"
+              exit={shouldReduceMotion ? { opacity: 0 } : "exit"}
+              initial={shouldReduceMotion ? { opacity: 0 } : "hidden"}
+              role="menu"
+              style={{
+                background: "oklch(0.13 0.008 250 / 90%)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                borderColor: "oklch(1 0 0 / 0.08)",
+                boxShadow:
+                  "0 8px 32px oklch(0 0 0 / 0.4), 0 0 0 1px oklch(1 0 0 / 0.03)",
+              }}
+              variants={menuVariants}
             >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>Sign Out</span>
-            </motion.button>
-          </motion.div>
+              {/* Header */}
+              <motion.div
+                className="flex items-center gap-2.5 px-3 py-2"
+                custom={0}
+                variants={shouldReduceMotion ? undefined : itemVariants}
+              >
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded-full font-semibold text-[10px]"
+                  style={{
+                    background: "oklch(0.3 0.05 250)",
+                    color: "oklch(0.8 0.08 250)",
+                  }}
+                >
+                  {initials}
+                </div>
+                <div>
+                  <p className="font-medium text-[13px] leading-tight">
+                    {session.user.name}
+                  </p>
+                  <p
+                    className="text-[11px] leading-tight"
+                    style={{ color: "oklch(0.5 0.02 250)" }}
+                  >
+                    Account
+                  </p>
+                </div>
+              </motion.div>
+
+              <div
+                className="mx-2 my-1 h-px"
+                style={{ background: "oklch(1 0 0 / 0.06)" }}
+              />
+
+              {/* Email */}
+              <motion.div
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12px]"
+                custom={1}
+                role="menuitem"
+                style={{ color: "oklch(0.55 0.02 250)" }}
+                variants={shouldReduceMotion ? undefined : itemVariants}
+              >
+                <Mail className="h-3.5 w-3.5" />
+                <span className="truncate">{session.user.email}</span>
+              </motion.div>
+
+              {/* Sign Out */}
+              <a
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/5"
+                href="/api/sign-out"
+                role="menuitem"
+                style={{ color: "oklch(0.65 0.14 25)" }}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>Sign Out</span>
+              </a>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>
