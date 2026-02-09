@@ -1,17 +1,28 @@
 <p align="center">
   <img src="apps/web/public/logo.png" alt="Pause Logo" width="120" />
+  <br/><br/>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+  <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js-16-black" alt="Built with Next.js 16" /></a>
+  <a href="https://sdk.vercel.ai"><img src="https://img.shields.io/badge/AI%20SDK-v6-blue" alt="Powered by Vercel AI SDK" /></a>
+  <a href="https://www.comet.com/site/products/opik/"><img src="https://img.shields.io/badge/Opik-tracing-purple" alt="Observability by Opik" /></a>
 </p>
 
-# Pause
+<h1 align="center">Pause</h1>
 
-**AI-powered financial guardian that helps you pause before impulse purchases.**
+<p align="center">
+  <strong>AI-powered financial guardian that helps you pause before impulse purchases.</strong>
+</p>
 
-Pause intercepts the moment of temptation with a three-tier AI system — analyzing risk, negotiating savings, and prompting reflection — so you make spending decisions you won't regret.
+Americans spend over **$5,400 per year** on impulse purchases. Most people regret these decisions within days. Pause intercepts the moment of temptation with a three-tier AI system — analyzing risk, negotiating savings, and prompting reflection — so you make spending decisions you won't regret.
 
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Built with Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
-[![Powered by Vercel AI SDK](https://img.shields.io/badge/AI%20SDK-v6-blue)](https://sdk.vercel.ai)
-[![Observability by Opik](https://img.shields.io/badge/Opik-tracing-purple)](https://www.comet.com/site/products/opik/)
+> Built for the **Encode Club Hackathon** — Financial Health & Best Use of Opik categories.
+
+<!-- TODO: Replace with actual URLs once deployed -->
+<!-- **[Live Demo](https://pause.vercel.app)** | **[Demo Video (3 min)](https://youtu.be/...)** 
+
+<p align="center">
+  <img src="apps/web/public/og-image.png" alt="Pause — AI Financial Guardian" width="600" />
+</p>-->
 
 ## Architecture
 
@@ -45,15 +56,41 @@ graph TB
 
 ## Features
 
+### Core Guardian Flow
+
 - **Guardian AI** — Three-tier system (Analyst / Negotiator / Therapist) that adapts responses to purchase risk level
 - **Auto-approve** — Low-risk purchases pass through instantly with no friction
-- **Coupon Search** — Negotiator tier finds and applies savings before you unlock
-- **Reflection Prompts** — Therapist tier guides you through evidence-based spending reflection
-- **[ACE Learning](packages/ace/README.md)** — Self-improving Skillbook learns your patterns and gets smarter over time
-- **Ghost Cards** — "Ghost of Spending Past" resurfaces past decisions for delayed satisfaction feedback
+- **Coupon Search** — Negotiator tier finds real savings and applies them before you unlock your card
+- **Reflection Prompts** — Therapist tier guides you through evidence-based spending reflection techniques
+
+### Learning & Feedback
+
+- **[ACE Learning](packages/ace/README.md)** — Self-improving Skillbook learns your spending patterns and gets smarter with every interaction
+- **Ghost of Spending Past** — Resurfaces past purchases days later so you can reflect on whether they were worth it
+
+### Operations & Observability
+
 - **Dashboard** — Interaction history, savings counter, and learning visualization
 - **Opik Observability** — Full trace pipeline with reasoning summaries, strategy predictions, and feedback scores
 - **Demo Mode** — Pre-seeded data and deterministic AI for live demonstrations
+
+## How It Works
+
+```
+1. You tap your card to make a purchase
+         ↓
+2. Pause intercepts and assesses risk (low / medium / high)
+         ↓
+3. Low risk → Auto-approved instantly
+   Medium risk → Negotiator finds coupons & savings
+   High risk → Therapist prompts reflection
+         ↓
+4. You decide: unlock, save, or wait 24 hours
+         ↓
+5. Days later, Ghost Card asks: "Was it worth it?"
+         ↓
+6. Your feedback trains the AI — it learns YOUR patterns
+```
 
 ## Tech Stack
 
@@ -81,7 +118,7 @@ graph TB
 
 ```bash
 # Clone
-git clone <repo-url>
+git clone https://github.com/armelhbobdad/pause.git
 cd pause
 
 # Install dependencies
@@ -110,7 +147,7 @@ The app runs at `http://localhost:3001`.
 | `BETTER_AUTH_SECRET` | Yes | Session encryption secret (32+ characters) |
 | `BETTER_AUTH_URL` | Yes | Base URL (`http://localhost:3001` in dev) |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | Yes | Google AI API key for Gemini |
-| `OPIK_API_KEY` | Prod | Opik tracing API key |
+| `OPIK_API_KEY` | Production only | Opik tracing API key |
 | `OPIK_PROJECT_NAME` | No | Opik project name (default: `pause`) |
 | `OPIK_WORKSPACE` | No | Opik workspace for team separation |
 | `DEMO_MODE` | No | `true` / `false` — enables deterministic AI + mock data |
@@ -144,15 +181,6 @@ bun run db:push      # Push schema to database
 bun run db:studio    # Open Drizzle Studio
 bun test             # Run test suite
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feat/your-feature`)
-3. Commit changes following [Conventional Commits](https://www.conventionalcommits.org/)
-4. Push and open a pull request
-
-Code quality is enforced by [Biome](https://biomejs.dev/). Run `bun x ultracite fix` before committing.
 
 ## License
 
