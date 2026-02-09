@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -30,13 +31,13 @@ export function AppNavbar() {
       }}
     >
       <div className="flex items-center gap-6">
-        <Link className="flex items-center gap-1.5 pl-1" href="/">
-          <span
-            className="inline-block h-2.5 w-2.5 rounded-full"
-            style={{
-              background: "var(--accent-glow)",
-              boxShadow: "0 0 8px var(--accent-glow)",
-            }}
+        <Link className="flex items-center gap-2 pl-1" href="/">
+          <Image
+            alt="Pause"
+            className="rounded-md"
+            height={28}
+            src="/logo.png"
+            width={28}
           />
           <span
             className="font-bold text-lg tracking-tight"
