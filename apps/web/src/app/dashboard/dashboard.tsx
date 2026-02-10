@@ -271,9 +271,13 @@ export default function Dashboard() {
     </div>
   );
 
-  // Invalidate all dashboard queries so stats refresh automatically
+  // Invalidate all dashboard queries so stats refresh automatically.
+  // The server's after() callback writes the final interaction status
+  // asynchronously after the response is sent. A second invalidation
+  // after a short delay catches the committed DB update.
   const handleRefresh = () => {
     queryClient.invalidateQueries();
+    setTimeout(() => queryClient.invalidateQueries(), 2000);
   };
 
   return (
