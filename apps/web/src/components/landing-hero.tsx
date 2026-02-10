@@ -38,7 +38,7 @@ export function LandingHero() {
   return (
     <section
       aria-labelledby="hero-heading"
-      className="mx-auto flex min-h-[100dvh] max-w-[1200px] flex-col items-center justify-center gap-8 px-4 py-12 text-center"
+      className="mx-auto flex min-h-[100dvh] max-w-[1200px] flex-col items-center justify-center gap-8 px-4 py-8 text-center sm:py-12"
     >
       <motion.div
         animate={animate}
@@ -139,7 +139,7 @@ export function LandingHero() {
         >
           {features.map((feature) => (
             <div
-              className="stat-card flex items-center gap-3 text-left"
+              className="stat-card flex min-w-0 items-center gap-3 text-left"
               key={feature.label}
             >
               <feature.icon
@@ -160,7 +160,10 @@ export function LandingHero() {
           className="flex w-full flex-col items-center gap-3 sm:w-auto"
           variants={itemVariants}
         >
-          <Link className="w-full sm:w-auto" href="/login">
+          <Link
+            className="w-full max-w-xs sm:w-auto sm:max-w-none"
+            href="/login"
+          >
             <NativeButton className="w-full sm:w-auto" glow>
               See Pause in Action (~45s)
             </NativeButton>

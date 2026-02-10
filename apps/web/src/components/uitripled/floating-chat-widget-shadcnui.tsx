@@ -164,7 +164,7 @@ export function FloatingChatWidget({
             aria-label="Chat with Pause"
             className={cn(
               "overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-xl",
-              "w-[360px] max-sm:w-full max-sm:rounded-none max-sm:rounded-t-2xl"
+              "w-[360px] max-sm:h-[calc(100dvh-env(safe-area-inset-top))] max-sm:w-full max-sm:rounded-none max-sm:rounded-t-2xl"
             )}
             exit="exit"
             id={panelId}
@@ -208,7 +208,7 @@ export function FloatingChatWidget({
             {/* Messages area */}
             <div
               className="flex flex-col gap-3 overflow-y-auto p-4"
-              style={{ height: "min(320px, 50dvh)" }}
+              style={{ height: "min(320px, 60dvh)" }}
             >
               {messages.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
@@ -294,7 +294,7 @@ export function FloatingChatWidget({
           "group relative flex h-14 w-14 cursor-pointer items-center justify-center rounded-full shadow-2xl transition-all",
           "max-sm:mb-[env(safe-area-inset-bottom)]",
           isOpen
-            ? "bg-destructive text-destructive-foreground"
+            ? "bg-destructive text-destructive-foreground max-sm:hidden"
             : "text-primary-foreground hover:shadow-primary/25"
         )}
         id="tour-chat-bubble"

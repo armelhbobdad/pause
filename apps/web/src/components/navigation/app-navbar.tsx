@@ -41,7 +41,7 @@ export function AppNavbar() {
           width={26}
         />
         <span
-          className="font-semibold text-[15px] tracking-[-0.01em]"
+          className="font-semibold text-[15px] tracking-[-0.01em] max-sm:hidden"
           style={{ color: "oklch(0.95 0.01 250)" }}
         >
           Pause
@@ -54,7 +54,7 @@ export function AppNavbar() {
           const isActive = activeIndex === index;
           return (
             <Link
-              className="relative px-3 py-1.5 font-medium text-[13px] transition-colors"
+              className="relative px-3 py-1.5 font-medium text-[13px] transition-colors max-sm:px-2"
               href={item.href}
               key={item.href}
               style={{

@@ -224,7 +224,7 @@ export default function Dashboard() {
 
   const feedContent = (
     <div
-      className="flex flex-col gap-3 px-4 pb-4"
+      className="flex flex-col gap-3 px-4 pb-24"
       data-celebrate={celebrating || undefined}
       data-testid="dashboard-feed"
       style={{

@@ -112,7 +112,7 @@ export function StatsPanel({
               className="stat-card flex flex-col"
               data-testid="stat-friction-score"
             >
-              <span className="text-muted-foreground text-xs">
+              <span className="truncate text-muted-foreground text-xs">
                 Good Friction Score
               </span>
               <span

@@ -148,14 +148,9 @@ function DemoPanelContent() {
 
   return (
     <div
+      className="fixed bottom-4 left-4 z-[var(--z-float)] max-sm:bottom-20"
       id="tour-demo-panel"
       ref={panelRef}
-      style={{
-        position: "fixed",
-        bottom: 16,
-        left: 16,
-        zIndex: "var(--z-float)",
-      }}
     >
       {/* Floating DEMO Pill Trigger */}
       <motion.button
