@@ -126,6 +126,7 @@ const TRANSITIONS: Record<
   expanding: {
     EXPANSION_COMPLETE: { status: "active", revealType: null },
     GUARDIAN_ERROR: { status: "revealed", revealType: "break_glass" },
+    RELOCK: { status: "idle", revealType: null },
   },
   active: {
     RESPONSE_RECEIVED: { status: "collapsing", revealType: null },
@@ -305,8 +306,8 @@ export function useGuardianState(
   }
 
   function relock() {
-    // Valid from both revealed and active states (Story 5.3: wait flow dispatches from active)
-    if (state !== "revealed" && state !== "active") {
+    // Valid from revealed, active (Story 5.3: wait flow), and expanding (dialog dismissed early)
+    if (state !== "revealed" && state !== "active" && state !== "expanding") {
       return;
     }
     dispatch({ type: "RELOCK" });
