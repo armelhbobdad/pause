@@ -5,9 +5,7 @@ import { useEffect } from "react";
 
 import { RecentInteractions } from "@/components/dashboard/recent-interactions";
 import { ReferralCard } from "@/components/dashboard/referral-card";
-import { SavingsBreakdown } from "@/components/dashboard/savings-breakdown";
-import { SavingsCounter } from "@/components/dashboard/savings-counter";
-import { SavingsSummary } from "@/components/dashboard/savings-summary";
+import { SavingsHero } from "@/components/dashboard/savings-hero";
 import { CommandCenter } from "@/components/guardian/command-center";
 import { GhostCardFeed } from "@/components/guardian/ghost-card-feed";
 import { GhostCardManagerProvider } from "@/components/guardian/ghost-card-manager";
@@ -236,23 +234,16 @@ export default function Dashboard() {
         animation: celebrating ? "celebrate-pulse 0.3s ease-out" : undefined,
       }}
     >
-      <SavingsSummary
-        acceptanceRate={data.acceptanceRate}
-        interactionCount={data.interactionCount}
-        totalSavedCents={data.totalSavedCents}
-      />
-
-      {!savingsLoading && savingsData && (
-        <div id="tour-savings">
-          <SavingsCounter totalCents={savingsData.totalCents} />
-          <SavingsBreakdown
-            avgCents={savingsData.avgCents}
-            dealCount={savingsData.dealCount}
-            sourceBreakdown={savingsData.sourceBreakdown}
-            totalCents={savingsData.totalCents}
-          />
-        </div>
-      )}
+      <div id="tour-savings">
+        <SavingsHero
+          acceptanceRate={data.acceptanceRate}
+          interactionCount={data.interactionCount}
+          savingsDetail={
+            !savingsLoading && savingsData ? savingsData : undefined
+          }
+          totalSavedCents={data.totalSavedCents}
+        />
+      </div>
 
       <StatsPanel
         goodFrictionScore={Math.round(data.acceptanceRate)}
@@ -260,7 +251,6 @@ export default function Dashboard() {
         pauses={data.interactionCount}
         sparklineData={[]}
         streak={0}
-        totalSavedCents={data.totalSavedCents}
       />
 
       <div id="tour-history">

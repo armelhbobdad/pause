@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StatsPanel } from "./stats-panel";
 
 const defaultProps = {
-  totalSavedCents: 5000,
   streak: 3,
   pauses: 7,
   goodFrictionScore: 85,
@@ -39,20 +38,12 @@ describe("StatsPanel", () => {
     expect(screen.getByTestId("stats-panel-content")).toBeDefined();
   });
 
-  it("renders 4 metric items when expanded", () => {
+  it("renders 3 metric items when expanded", () => {
     render(<StatsPanel {...defaultProps} />);
     fireEvent.click(screen.getByTestId("stats-panel-toggle"));
-    expect(screen.getByTestId("stat-total-saved")).toBeDefined();
     expect(screen.getByTestId("stat-streak")).toBeDefined();
     expect(screen.getByTestId("stat-pauses")).toBeDefined();
     expect(screen.getByTestId("stat-friction-score")).toBeDefined();
-  });
-
-  it("displays totalSavedCents as dollars (divided by 100)", () => {
-    render(<StatsPanel {...defaultProps} />);
-    fireEvent.click(screen.getByTestId("stats-panel-toggle"));
-    const saved = screen.getByTestId("stat-total-saved");
-    expect(saved.textContent).toContain("$50.00");
   });
 
   it("collapses panel when toggle is clicked again", () => {
@@ -96,11 +87,11 @@ describe("StatsPanel", () => {
     expect(screen.getByTestId("sparkline-container")).toBeDefined();
   });
 
-  it("uses single-column grid on mobile (grid-cols-1 class)", () => {
+  it("uses three-column grid layout (grid-cols-3 class)", () => {
     render(<StatsPanel {...defaultProps} />);
     fireEvent.click(screen.getByTestId("stats-panel-toggle"));
     const grid = screen.getByTestId("stats-grid");
-    expect(grid.className).toContain("grid-cols-1");
+    expect(grid.className).toContain("grid-cols-3");
   });
 
   it("renders children inside expanded panel", () => {

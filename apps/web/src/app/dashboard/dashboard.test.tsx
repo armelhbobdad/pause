@@ -261,8 +261,8 @@ describe("Dashboard", () => {
 
     renderDashboard();
 
-    // SavingsSummary renders
-    expect(screen.getByTestId("total-saved")).toHaveTextContent("$25.00");
+    // SavingsHero renders
+    expect(screen.getByTestId("savings-hero")).toBeInTheDocument();
     expect(screen.getByTestId("interaction-count")).toHaveTextContent(
       "5 Guardian interactions"
     );
@@ -284,7 +284,7 @@ describe("Dashboard", () => {
     renderDashboard();
 
     // Data visible, no skeleton
-    expect(screen.getByTestId("total-saved")).toHaveTextContent("$15.00");
+    expect(screen.getByTestId("savings-hero")).toBeInTheDocument();
     expect(screen.queryByTestId("dashboard-skeleton")).not.toBeInTheDocument();
   });
 
@@ -311,7 +311,7 @@ describe("Dashboard", () => {
     expect(screen.getByTestId("savings-breakdown")).toBeInTheDocument();
   });
 
-  it("hides savings counter when savings data is loading", () => {
+  it("hides savings breakdown when savings data is loading", () => {
     mocks.dashboardResult.data = {
       interactionCount: 3,
       totalSavedCents: 6200,
@@ -322,7 +322,9 @@ describe("Dashboard", () => {
 
     renderDashboard();
 
-    expect(screen.queryByTestId("savings-counter")).not.toBeInTheDocument();
+    // Counter always visible via SavingsHero, but breakdown hidden until detail loads
+    expect(screen.getByTestId("savings-counter")).toBeInTheDocument();
+    expect(screen.queryByTestId("savings-breakdown")).not.toBeInTheDocument();
   });
 
   it("renders feed content inside CommandCenter", () => {

@@ -7,7 +7,6 @@ import { Sparkline } from "./sparkline";
 const STORAGE_KEY = "pause-stats-pinned-v1";
 
 interface StatsPanelProps {
-  totalSavedCents: number;
   streak: number;
   pauses: number;
   goodFrictionScore: number;
@@ -32,17 +31,7 @@ function writePinned(value: boolean): void {
   }
 }
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-function formatCentsToDollars(cents: number): string {
-  return currencyFormatter.format(cents / 100);
-}
-
 export function StatsPanel({
-  totalSavedCents,
   streak,
   pauses,
   goodFrictionScore,
@@ -100,22 +89,7 @@ export function StatsPanel({
 
       {expanded && (
         <div data-testid="stats-panel-content" id={panelId}>
-          <div
-            className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
-            data-testid="stats-grid"
-          >
-            <div
-              className="stat-card flex flex-col"
-              data-testid="stat-total-saved"
-            >
-              <span className="text-muted-foreground text-xs">Total Saved</span>
-              <span
-                className="font-bold text-lg"
-                style={{ fontFamily: "var(--font-data)" }}
-              >
-                {formatCentsToDollars(totalSavedCents)}
-              </span>
-            </div>
+          <div className="mt-3 grid grid-cols-3 gap-3" data-testid="stats-grid">
             <div className="stat-card flex flex-col" data-testid="stat-streak">
               <span className="text-muted-foreground text-xs">Streak</span>
               <span
