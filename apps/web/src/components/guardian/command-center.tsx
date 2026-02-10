@@ -84,6 +84,7 @@ export function CommandCenter({
   onTimeout,
   relockTimeoutMs = 300_000,
   onAutoRelock,
+  onReveal,
   className,
 }: CommandCenterProps) {
   return (
@@ -97,6 +98,7 @@ export function CommandCenter({
         guardianContent={guardianContent}
         onAutoRelock={onAutoRelock}
         onCountdownExpire={onCountdownExpire}
+        onReveal={onReveal}
         onTimeout={onTimeout}
         relockTimeoutMs={relockTimeoutMs}
         showCountdown={showCountdown}
