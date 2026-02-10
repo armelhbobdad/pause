@@ -587,6 +587,54 @@ describe("GhostCardFeed", () => {
     expect(mockRequestDefrost).toHaveBeenCalledWith("gc-1");
   });
 
+  it("transitions card state to revealed when requestDefrost returns true", async () => {
+    mockRequestDefrost.mockReturnValue(true);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ cards: [makeApiCard()], nextCursor: null }),
+    });
+
+    renderFeed();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ghost-card-gc-1")).toHaveAttribute(
+        "data-state",
+        "frosted"
+      );
+    });
+
+    await userEvent.click(screen.getByTestId("defrost-gc-1"));
+
+    expect(screen.getByTestId("ghost-card-gc-1")).toHaveAttribute(
+      "data-state",
+      "revealed"
+    );
+  });
+
+  it("keeps card frosted when requestDefrost returns false", async () => {
+    mockRequestDefrost.mockReturnValue(false);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ cards: [makeApiCard()], nextCursor: null }),
+    });
+
+    renderFeed();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ghost-card-gc-1")).toHaveAttribute(
+        "data-state",
+        "frosted"
+      );
+    });
+
+    await userEvent.click(screen.getByTestId("defrost-gc-1"));
+
+    expect(screen.getByTestId("ghost-card-gc-1")).toHaveAttribute(
+      "data-state",
+      "frosted"
+    );
+  });
+
   // ========================================================================
   // Accessibility (AC10)
   // ========================================================================

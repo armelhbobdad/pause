@@ -383,7 +383,9 @@ Navigate to `/dashboard` to see:
 
 **How to see them:**
 - With **Pro seed**, there's 1 pending ghost card (from a "Wireless headphones - $89" purchase 3 days ago)
-- Ghost cards appear in the dashboard's ghost card feed
+- Ghost cards appear in the dashboard's **"Spending Reflections"** section
+- Cards start **frosted** (blurred) by design — this is the "good friction" teaser, not a bug
+- **Scroll down** to the card and it will automatically defrost with a smooth reveal animation
 - Click to provide feedback: "Was it worth it?" (satisfied / regret / neutral)
 - This feedback flows into the ACE learning pipeline, updating the Skillbook
 
