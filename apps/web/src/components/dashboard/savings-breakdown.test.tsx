@@ -19,13 +19,11 @@ describe("SavingsBreakdown", () => {
     vi.clearAllMocks();
   });
 
-  it("renders total in savings-gold with JetBrains Mono", () => {
+  it("renders toggle with View details text", () => {
     render(<SavingsBreakdown {...defaultProps} />);
 
-    const total = screen.getByTestId("breakdown-total");
-    expect(total).toHaveTextContent("$62.00");
-    expect(total.style.fontFamily).toBe("var(--font-data)");
-    expect(total.style.color).toBe("var(--savings-gold)");
+    const toggle = screen.getByTestId("savings-breakdown-toggle");
+    expect(toggle).toHaveTextContent("View details");
   });
 
   it("shows empty state when no deals", () => {
@@ -110,8 +108,6 @@ describe("SavingsBreakdown", () => {
         totalCents={12_345}
       />
     );
-
-    expect(screen.getByTestId("breakdown-total")).toHaveTextContent("$123.45");
 
     await user.click(screen.getByTestId("savings-breakdown-toggle"));
     expect(screen.getByTestId("breakdown-avg")).toHaveTextContent("$41.15");

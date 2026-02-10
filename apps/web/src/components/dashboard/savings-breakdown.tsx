@@ -29,7 +29,6 @@ interface SavingsBreakdownProps {
 }
 
 export function SavingsBreakdown({
-  totalCents,
   dealCount,
   avgCents,
   sourceBreakdown,
@@ -59,16 +58,6 @@ export function SavingsBreakdown({
           onClick={() => setExpanded((prev) => !prev)}
           type="button"
         >
-          <span
-            className="font-bold text-lg"
-            data-testid="breakdown-total"
-            style={{
-              fontFamily: "var(--font-data)",
-              color: "var(--savings-gold)",
-            }}
-          >
-            {formatCentsToDollars(totalCents)}
-          </span>
           <span className="text-muted-foreground text-sm">
             {expanded ? "Hide details" : "View details"}
           </span>

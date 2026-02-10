@@ -36,7 +36,7 @@ export default function LoginPage() {
 
   return (
     <div
-      className="flex min-h-full flex-col items-center justify-center px-4"
+      className="flex min-h-dvh flex-col items-center justify-center px-4"
       style={{
         background:
           "radial-gradient(ellipse at 50% 0%, oklch(0.18 0.04 250 / 50%), transparent 70%)",

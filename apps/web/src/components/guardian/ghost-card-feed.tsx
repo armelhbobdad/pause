@@ -126,6 +126,9 @@ export function GhostCardFeed({
   const [submittingCards, setSubmittingCards] = useState<Set<string>>(
     () => new Set()
   );
+  const [defrostedCards, setDefrostedCards] = useState<Set<string>>(
+    () => new Set()
+  );
 
   const feedRef = useRef<HTMLDivElement>(null);
   const manager = useGhostCardManager();
@@ -251,7 +254,11 @@ export function GhostCardFeed({
       const effectiveCard = optFeedback
         ? { ...card, satisfactionFeedback: optFeedback }
         : card;
-      return mapToGhostCardProps(effectiveCard);
+      const props = mapToGhostCardProps(effectiveCard);
+      if (props && props.state === "frosted" && defrostedCards.has(card.id)) {
+        return { ...props, state: "revealed" as const };
+      }
+      return props;
     })
     .filter((c): c is GhostCardProps => c !== null);
 
@@ -281,7 +288,9 @@ export function GhostCardFeed({
             {...props}
             isSubmitting={submittingCards.has(props.id)}
             onDefrost={() => {
-              manager.requestDefrost(props.id);
+              if (manager.requestDefrost(props.id)) {
+                setDefrostedCards((prev) => new Set(prev).add(props.id));
+              }
             }}
             onSatisfactionFeedback={(satisfaction) => {
               handleSatisfactionFeedback(props.id, satisfaction);

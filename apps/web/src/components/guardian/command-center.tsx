@@ -14,7 +14,6 @@ import {
 import { GuardianErrorBoundary } from "@/components/guardian/guardian-error-boundary";
 import { GuardianErrorFallback } from "@/components/guardian/guardian-error-fallback";
 import { MessageRenderer } from "@/components/guardian/message-renderer";
-import { RelockTimer } from "@/components/guardian/relock-timer";
 import {
   NativeDialog,
   NativeDialogContent,
@@ -52,6 +51,8 @@ export interface CommandCenterProps {
   relockTimeoutMs?: number;
   /** Callback when auto-relock fires — used to POST feedback with "timeout" outcome */
   onAutoRelock?: () => void;
+  /** Callback when card is revealed (interaction completed) — used to refresh stats */
+  onReveal?: () => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -83,6 +84,7 @@ export function CommandCenter({
   onTimeout,
   relockTimeoutMs = 300_000,
   onAutoRelock,
+  onReveal,
   className,
 }: CommandCenterProps) {
   return (
@@ -96,6 +98,7 @@ export function CommandCenter({
         guardianContent={guardianContent}
         onAutoRelock={onAutoRelock}
         onCountdownExpire={onCountdownExpire}
+        onReveal={onReveal}
         onTimeout={onTimeout}
         relockTimeoutMs={relockTimeoutMs}
         showCountdown={showCountdown}
@@ -111,12 +114,10 @@ function CommandCenterInner({
   tier = "negotiator",
   guardianContent,
   feedContent,
-  showCountdown = false,
-  countdownDuration = 60_000,
-  onCountdownExpire,
   onTimeout,
   relockTimeoutMs = 300_000,
   onAutoRelock,
+  onReveal,
   className,
 }: CommandCenterProps) {
   const {
@@ -131,6 +132,15 @@ function CommandCenterInner({
     guardianError,
     relock,
   } = useGuardianState({ onTimeout, timeoutMs: 120_000 });
+
+  // Notify parent when card is revealed (interaction completed) so stats can refresh
+  const onRevealRef = useRef(onReveal);
+  onRevealRef.current = onReveal;
+  useEffect(() => {
+    if (isRevealed) {
+      onRevealRef.current?.();
+    }
+  }, [isRevealed]);
 
   // --- Dialog state: Guardian interaction happens inside NativeDialog ---
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -322,7 +332,7 @@ function CommandCenterInner({
       className={className}
       style={{
         display: "grid",
-        gridTemplateRows: "minmax(0, 2fr) minmax(0, 3fr)",
+        gridTemplateRows: "minmax(180px, 2fr) minmax(0, 3fr)",
         height: "100%",
         overflow: "hidden",
       }}
@@ -339,20 +349,13 @@ function CommandCenterInner({
         <div id="tour-card-vault" style={{ position: "relative" }}>
           <CardVault
             card={card}
-            countdownDuration={countdownDuration}
+            countdownDuration={relockTimeoutMs}
             isActive={isActive}
             isRevealed={isRevealed}
-            onCountdownExpire={onCountdownExpire}
+            onCountdownExpire={() => handleAutoRelock.current()}
             onUnlockRequest={handleCardActivate}
             revealType={revealType}
-            showCountdown={showCountdown && isRevealed}
-          />
-
-          {/* Auto-relock timer — only in revealed state, not break glass (Story 9.4) */}
-          <RelockTimer
-            durationMs={relockTimeoutMs}
-            isActive={isRevealed && revealType !== "break_glass"}
-            onExpire={() => handleAutoRelock.current()}
+            showCountdown={isRevealed}
           />
         </div>
 

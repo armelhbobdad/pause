@@ -86,7 +86,7 @@ export function RecentInteractions({ interactions }: RecentInteractionsProps) {
                 }}
               />
               <span
-                className="flex-1 truncate text-sm"
+                className="min-w-0 flex-1 truncate text-sm"
                 data-testid={
                   neutralLabel ? `neutral-${interaction.id}` : undefined
                 }
@@ -98,13 +98,13 @@ export function RecentInteractions({ interactions }: RecentInteractionsProps) {
                       interaction.outcome)
                     : "pending")}
               </span>
-              <span className="text-muted-foreground text-xs">
+              <span className="shrink-0 text-muted-foreground text-xs">
                 {interaction.cardLastFour
                   ? `••${interaction.cardLastFour}`
                   : ""}
               </span>
               <span
-                className="text-muted-foreground text-xs"
+                className="shrink-0 text-muted-foreground text-xs"
                 data-testid={`time-${interaction.id}`}
               >
                 {formatRelativeTime(new Date(interaction.createdAt))}

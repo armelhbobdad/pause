@@ -8,7 +8,7 @@ import {
   useTransform,
 } from "framer-motion";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { CountdownTimer } from "@/components/guardian/countdown-timer";
+import { useEffect, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RevealType } from "@/lib/guardian/types";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,182 @@ const OVERLAY_LIGHTS = [
   "radial-gradient(circle at 80% 20%, oklch(0.5 0.12 250 / 0.25), transparent 60%)",
   "radial-gradient(circle at 50% 80%, oklch(0.5 0.08 280 / 0.18), transparent 65%)",
 ].join(",");
+
+// ============================================================================
+// Demo Card Details Generator
+// ============================================================================
+
+/**
+ * Generate deterministic fake card details from last 4 digits.
+ * For demo/hackathon purposes only — produces realistic-looking card data.
+ */
+function generateDemoCardDetails(lastFour: string) {
+  const n = Number.parseInt(lastFour, 10) || 4242;
+  return {
+    fullNumber: `4532 ${String((n * 17 + 1234) % 10_000).padStart(4, "0")} ${String((n * 31 + 5678) % 10_000).padStart(4, "0")} ${lastFour}`,
+    cvv: String(((n * 3 + 47) % 900) + 100),
+    expiry: "12/28",
+    cardholder: "A. HOLDER",
+  };
+}
+
+// ============================================================================
+// Border Timer — SVG border-depletion animation for auto-relock countdown
+// ============================================================================
+
+/** SVG viewBox dimensions matching card aspect ratio (1.586) */
+const BT_W = 317;
+const BT_H = 200;
+const BT_R = 12;
+const BT_SW = 2.5;
+const BT_HALF = BT_SW / 2;
+const BT_RW = BT_W - BT_SW;
+const BT_RH = BT_H - BT_SW;
+const BT_PERIMETER =
+  2 * (BT_RW - 2 * BT_R) + 2 * (BT_RH - 2 * BT_R) + 2 * Math.PI * BT_R;
+
+/**
+ * Formats remaining milliseconds as M:SS.
+ */
+function formatTimeRemaining(remainingMs: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function BorderTimer({
+  durationMs,
+  isActive,
+  onExpire,
+}: {
+  durationMs: number;
+  isActive: boolean;
+  onExpire?: () => void;
+}) {
+  const [started, setStarted] = useState(false);
+  const [color, setColor] = useState("var(--relock-green)");
+  const [timeLabel, setTimeLabel] = useState(() =>
+    formatTimeRemaining(durationMs)
+  );
+  const startTimeRef = useRef(0);
+  const onExpireRef = useRef(onExpire);
+  onExpireRef.current = onExpire;
+
+  useEffect(() => {
+    if (!isActive) {
+      setStarted(false);
+      return;
+    }
+    startTimeRef.current = Date.now();
+    setTimeLabel(formatTimeRemaining(durationMs));
+    const frameId = requestAnimationFrame(() => setStarted(true));
+    return () => cancelAnimationFrame(frameId);
+  }, [isActive, durationMs]);
+
+  useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const fraction = Math.max(0, 1 - elapsed / durationMs);
+      const remainingMs = Math.max(0, durationMs - elapsed);
+      setTimeLabel(formatTimeRemaining(remainingMs));
+      if (fraction > 0.6) {
+        setColor("var(--relock-green)");
+      } else if (fraction > 0.3) {
+        setColor("var(--relock-yellow)");
+      } else {
+        setColor("var(--relock-red)");
+      }
+    }, 1000);
+    return () => clearInterval(intervalId);
+  }, [isActive, durationMs]);
+
+  useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+    const timeoutId = setTimeout(() => onExpireRef.current?.(), durationMs);
+    return () => clearTimeout(timeoutId);
+  }, [isActive, durationMs]);
+
+  if (!isActive) {
+    return null;
+  }
+
+  const dashTransition = `stroke-dashoffset ${durationMs}ms linear, stroke 400ms ease`;
+
+  return (
+    <>
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-20"
+        fill="none"
+        height="100%"
+        viewBox={`0 0 ${BT_W} ${BT_H}`}
+        width="100%"
+      >
+        {/* Glow layer */}
+        <rect
+          height={BT_RH}
+          rx={BT_R}
+          ry={BT_R}
+          style={{
+            stroke: color,
+            strokeWidth: BT_SW * 4,
+            strokeDasharray: BT_PERIMETER,
+            strokeDashoffset: started ? BT_PERIMETER : 0,
+            opacity: 0.2,
+            transition: started ? dashTransition : "none",
+          }}
+          width={BT_RW}
+          x={BT_HALF}
+          y={BT_HALF}
+        />
+        {/* Main border */}
+        <rect
+          height={BT_RH}
+          rx={BT_R}
+          ry={BT_R}
+          strokeLinecap="round"
+          style={{
+            stroke: color,
+            strokeWidth: BT_SW,
+            strokeDasharray: BT_PERIMETER,
+            strokeDashoffset: started ? BT_PERIMETER : 0,
+            transition: started ? dashTransition : "none",
+          }}
+          width={BT_RW}
+          x={BT_HALF}
+          y={BT_HALF}
+        />
+      </svg>
+
+      {/* Countdown label — explains the border timer to users */}
+      <div
+        aria-label={`Card will auto-lock in ${timeLabel}`}
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center pb-2"
+        role="timer"
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-data)",
+            fontSize: "0.6875rem",
+            letterSpacing: "0.04em",
+            color,
+            opacity: 0.85,
+            transition: "color 0.4s ease",
+            textShadow: "0 1px 4px rgba(0,0,0,0.5)",
+          }}
+        >
+          Auto-locks in <span style={{ fontWeight: 600 }}>{timeLabel}</span>
+        </span>
+      </div>
+    </>
+  );
+}
 
 // ============================================================================
 // Card Chip Component (glassmorphism chip element)
@@ -214,6 +390,9 @@ export function CardVault({
     return <CardVaultEmpty className={className} />;
   }
 
+  // Generate fake card details for reveal state
+  const cardDetails = generateDemoCardDetails(card.lastFour);
+
   // Dynamic aria-label based on state
   function getAriaLabel() {
     if (isRevealed) {
@@ -294,23 +473,128 @@ export function CardVault({
             style={{ background: OVERLAY_LIGHTS }}
           />
 
-          {/* Card content: chip, last 4 digits, nickname */}
-          <div className="relative z-10 flex h-full flex-col justify-between p-6">
-            <CardChip />
-            <div className="flex items-end justify-between">
+          {/* Card content: chip, branding, number, details */}
+          <div className="relative z-10 flex h-full flex-col p-6">
+            {/* Top: chip + branding */}
+            <div className="flex items-start justify-between">
+              <CardChip />
               <span
-                className="font-mono text-xl tracking-[0.2em] opacity-80"
-                style={{ fontFamily: "var(--font-data)" }}
+                className="text-muted-foreground"
+                style={{
+                  fontFamily: "var(--font-conversation)",
+                  fontSize: "clamp(0.625rem, 2vw, 0.75rem)",
+                  letterSpacing: "0.05em",
+                  opacity: 0.6,
+                }}
               >
-                •••• •••• •••• {card.lastFour}
-              </span>
-              <span
-                className="text-muted-foreground text-sm"
-                style={{ fontFamily: "var(--font-conversation)" }}
-              >
-                {card.nickname ?? "My Card"}
+                PAUSE
               </span>
             </div>
+
+            {/* Push card number to lower area like a real credit card */}
+            <div className="flex-1" />
+
+            {/* Card number — full when revealed, masked when locked */}
+            <span
+              className="mb-4"
+              style={{
+                fontFamily: "var(--font-data)",
+                fontSize: "clamp(1rem, 4vw, 1.375rem)",
+                letterSpacing: "0.12em",
+                opacity: 0.85,
+              }}
+            >
+              {isRevealed
+                ? cardDetails.fullNumber
+                : `•••• •••• •••• ${card.lastFour}`}
+            </span>
+
+            {/* Bottom: full details when revealed, nickname when locked */}
+            {isRevealed ? (
+              <div className="flex items-end justify-between">
+                <div>
+                  <span
+                    className="block text-muted-foreground"
+                    style={{
+                      fontFamily: "var(--font-conversation)",
+                      fontSize: "clamp(0.5rem, 1.5vw, 0.625rem)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      opacity: 0.5,
+                    }}
+                  >
+                    Cardholder
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-conversation)",
+                      fontSize: "clamp(0.75rem, 2.5vw, 0.875rem)",
+                      color: "var(--foreground)",
+                      opacity: 0.8,
+                    }}
+                  >
+                    {cardDetails.cardholder}
+                  </span>
+                </div>
+                <div>
+                  <span
+                    className="block text-muted-foreground"
+                    style={{
+                      fontFamily: "var(--font-conversation)",
+                      fontSize: "clamp(0.5rem, 1.5vw, 0.625rem)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      opacity: 0.5,
+                    }}
+                  >
+                    CVV
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-data)",
+                      fontSize: "clamp(0.75rem, 2.5vw, 0.875rem)",
+                      color: "var(--foreground)",
+                      opacity: 0.8,
+                    }}
+                  >
+                    {cardDetails.cvv}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span
+                    className="block text-muted-foreground"
+                    style={{
+                      fontFamily: "var(--font-conversation)",
+                      fontSize: "clamp(0.5rem, 1.5vw, 0.625rem)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      opacity: 0.5,
+                    }}
+                  >
+                    Expires
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-data)",
+                      fontSize: "clamp(0.75rem, 2.5vw, 0.875rem)",
+                      color: "var(--foreground)",
+                      opacity: 0.8,
+                    }}
+                  >
+                    {cardDetails.expiry}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-end justify-between">
+                <span
+                  className="text-muted-foreground text-sm"
+                  style={{ fontFamily: "var(--font-conversation)" }}
+                >
+                  {card.nickname ?? "My Card"}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Frost overlay with opacity transition for reveal animation.
@@ -332,18 +616,37 @@ export function CardVault({
                 "--frost-opacity": isRevealed ? 0 : 1,
               } as React.CSSProperties
             }
-          />
+          >
+            {/* First-time guidance: "Tap to unlock" hint at bottom of frost */}
+            {!(isActive || isRevealed) && (
+              <div
+                className="flex h-full items-end justify-center pb-5"
+                style={{ opacity: 0.7 }}
+              >
+                <span
+                  style={{
+                    fontFamily: "var(--font-conversation)",
+                    fontSize: "clamp(0.75rem, 2.5vw, 0.875rem)",
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: "var(--foreground)",
+                  }}
+                >
+                  Tap to unlock
+                </span>
+              </div>
+            )}
+          </div>
 
-          {/* Countdown timer appears at card bottom after reveal (UX-76)
-              Shows executive function window before auto-relock.
-              Break glass reveals skip timer — emergency unlock, not time-limited (Story 2.6 AC#2). */}
-          {isRevealed && showCountdown && revealType !== "break_glass" && (
-            <CountdownTimer
-              durationMs={countdownDuration}
-              onExpire={onCountdownExpire}
-            />
-          )}
+          {/* Auto-relock countdown handled by RelockTimer in CommandCenter */}
         </div>
+
+        {/* Border timer — SVG overlay traces card perimeter, depleting green→yellow→red */}
+        <BorderTimer
+          durationMs={countdownDuration}
+          isActive={isRevealed && showCountdown && revealType !== "break_glass"}
+          onExpire={onCountdownExpire}
+        />
       </motion.div>
     </div>
   );

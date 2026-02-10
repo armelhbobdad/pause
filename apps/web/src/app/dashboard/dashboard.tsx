@@ -1,13 +1,11 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { RecentInteractions } from "@/components/dashboard/recent-interactions";
 import { ReferralCard } from "@/components/dashboard/referral-card";
-import { SavingsBreakdown } from "@/components/dashboard/savings-breakdown";
-import { SavingsCounter } from "@/components/dashboard/savings-counter";
-import { SavingsSummary } from "@/components/dashboard/savings-summary";
+import { SavingsHero } from "@/components/dashboard/savings-hero";
 import { CommandCenter } from "@/components/guardian/command-center";
 import { GhostCardFeed } from "@/components/guardian/ghost-card-feed";
 import { GhostCardManagerProvider } from "@/components/guardian/ghost-card-manager";
@@ -151,6 +149,7 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
   const { data, isLoading, error, refetch } = useQuery({
     ...trpc.dashboard.summary.queryOptions(),
     refetchOnWindowFocus: true,
@@ -225,7 +224,7 @@ export default function Dashboard() {
 
   const feedContent = (
     <div
-      className="flex flex-col gap-3 px-4 pb-4"
+      className="flex flex-col gap-3 px-4 pb-24"
       data-celebrate={celebrating || undefined}
       data-testid="dashboard-feed"
       style={{
@@ -235,23 +234,16 @@ export default function Dashboard() {
         animation: celebrating ? "celebrate-pulse 0.3s ease-out" : undefined,
       }}
     >
-      <SavingsSummary
-        acceptanceRate={data.acceptanceRate}
-        interactionCount={data.interactionCount}
-        totalSavedCents={data.totalSavedCents}
-      />
-
-      {!savingsLoading && savingsData && (
-        <div id="tour-savings">
-          <SavingsCounter totalCents={savingsData.totalCents} />
-          <SavingsBreakdown
-            avgCents={savingsData.avgCents}
-            dealCount={savingsData.dealCount}
-            sourceBreakdown={savingsData.sourceBreakdown}
-            totalCents={savingsData.totalCents}
-          />
-        </div>
-      )}
+      <div id="tour-savings">
+        <SavingsHero
+          acceptanceRate={data.acceptanceRate}
+          interactionCount={data.interactionCount}
+          savingsDetail={
+            !savingsLoading && savingsData ? savingsData : undefined
+          }
+          totalSavedCents={data.totalSavedCents}
+        />
+      </div>
 
       <StatsPanel
         goodFrictionScore={Math.round(data.acceptanceRate)}
@@ -259,7 +251,6 @@ export default function Dashboard() {
         pauses={data.interactionCount}
         sparklineData={[]}
         streak={0}
-        totalSavedCents={data.totalSavedCents}
       />
 
       <div id="tour-history">
@@ -280,11 +271,22 @@ export default function Dashboard() {
     </div>
   );
 
+  // Invalidate all dashboard queries so stats refresh automatically.
+  // The server's after() callback writes the final interaction status
+  // asynchronously after the response is sent. A second invalidation
+  // after a short delay catches the committed DB update.
+  const handleRefresh = () => {
+    queryClient.invalidateQueries();
+    setTimeout(() => queryClient.invalidateQueries(), 2000);
+  };
+
   return (
     <CommandCenter
       card={card}
       cardId={cardData?.id}
       feedContent={feedContent}
+      onAutoRelock={handleRefresh}
+      onReveal={handleRefresh}
     />
   );
 }

@@ -118,7 +118,9 @@ describe("CommandCenter", () => {
       const { container } = render(<CommandCenter card={mockCard} />);
       const root = container.firstElementChild as HTMLElement;
       expect(root.style.display).toBe("grid");
-      expect(root.style.gridTemplateRows).toBe("minmax(0, 2fr) minmax(0, 3fr)");
+      expect(root.style.gridTemplateRows).toBe(
+        "minmax(180px, 2fr) minmax(0, 3fr)"
+      );
     });
 
     it("renders feed content", () => {
