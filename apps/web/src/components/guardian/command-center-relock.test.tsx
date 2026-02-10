@@ -5,11 +5,7 @@ import { CommandCenter } from "./command-center";
 
 // --- Mocks (same set as command-center.test.tsx) ---
 
-vi.mock("@/components/guardian/countdown-timer", () => ({
-  CountdownTimer: ({ durationMs }: { durationMs: number }) => (
-    <div data-duration={durationMs} data-testid="countdown-timer" />
-  ),
-}));
+// CardVault is now self-contained (BorderTimer is internal), no countdown-timer mock needed
 
 vi.mock("@/components/ui/skeleton", () => ({
   Skeleton: ({ className }: { className?: string }) => (
@@ -127,19 +123,19 @@ describe("CommandCenter auto-relock (Story 9.4)", () => {
   it("shows relock timer in revealed state", () => {
     setRevealedState("earned");
     render(<CommandCenter card={mockCard} />);
-    expect(screen.getByTestId("relock-timer")).toBeInTheDocument();
+    expect(screen.getByRole("timer")).toBeInTheDocument();
   });
 
   it("does not show relock timer in idle state", () => {
     // Default state (no override) is idle
     render(<CommandCenter card={mockCard} />);
-    expect(screen.queryByTestId("relock-timer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 
   it("does not show relock timer in break glass state", () => {
     setRevealedState("break_glass");
     render(<CommandCenter card={mockCard} />);
-    expect(screen.queryByTestId("relock-timer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 
   it("auto-relock dispatches RELOCK after timeout", () => {

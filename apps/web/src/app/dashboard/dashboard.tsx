@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { RecentInteractions } from "@/components/dashboard/recent-interactions";
@@ -151,6 +151,7 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
   const { data, isLoading, error, refetch } = useQuery({
     ...trpc.dashboard.summary.queryOptions(),
     refetchOnWindowFocus: true,
@@ -280,11 +281,18 @@ export default function Dashboard() {
     </div>
   );
 
+  // Invalidate all dashboard queries so stats refresh automatically
+  const handleRefresh = () => {
+    queryClient.invalidateQueries();
+  };
+
   return (
     <CommandCenter
       card={card}
       cardId={cardData?.id}
       feedContent={feedContent}
+      onAutoRelock={handleRefresh}
+      onReveal={handleRefresh}
     />
   );
 }

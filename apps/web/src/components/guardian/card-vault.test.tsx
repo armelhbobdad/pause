@@ -227,22 +227,29 @@ describe("CardVault", () => {
   // Countdown Timer
   // ==========================================================================
 
-  describe("countdown timer", () => {
-    it("shows countdown when revealed and showCountdown is true", () => {
-      render(
+  describe("border timer", () => {
+    it("shows border timer SVG when revealed and showCountdown is true", () => {
+      const { container } = render(
         <CardVault card={mockCard} isRevealed={true} showCountdown={true} />
       );
-      expect(screen.getByTestId("countdown-timer")).toBeInTheDocument();
+      const svg = container.querySelector("svg");
+      expect(svg).toBeInTheDocument();
     });
 
-    it("does not show countdown when not revealed", () => {
-      render(<CardVault card={mockCard} showCountdown={true} />);
-      expect(screen.queryByTestId("countdown-timer")).not.toBeInTheDocument();
+    it("does not show border timer when not revealed", () => {
+      const { container } = render(
+        <CardVault card={mockCard} showCountdown={true} />
+      );
+      const svg = container.querySelector("svg");
+      expect(svg).not.toBeInTheDocument();
     });
 
-    it("does not show countdown when showCountdown is false", () => {
-      render(<CardVault card={mockCard} isRevealed={true} />);
-      expect(screen.queryByTestId("countdown-timer")).not.toBeInTheDocument();
+    it("does not show border timer when showCountdown is false", () => {
+      const { container } = render(
+        <CardVault card={mockCard} isRevealed={true} />
+      );
+      const svg = container.querySelector("svg");
+      expect(svg).not.toBeInTheDocument();
     });
   });
 
