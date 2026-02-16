@@ -230,11 +230,22 @@ function ReflectionPromptContainer({
   const [isOverridden, setIsOverridden] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
 
-  const handleOverride = () => {
-    if (isOverridden || isWaiting) {
+  const handleOverride = async () => {
+    if (isOverridden || isWaiting || !interactionId) {
       return;
     }
     setIsOverridden(true);
+
+    try {
+      await fetch("/api/ai/guardian/skip-savings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ interactionId }),
+      });
+    } catch {
+      /* best-effort — card reveals regardless */
+    }
+
     onRevealApproved?.();
   };
 
@@ -283,11 +294,22 @@ function WaitCardContainer({
   const [isOverridden, setIsOverridden] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
 
-  const handleOverride = () => {
-    if (isOverridden || isWaiting) {
+  const handleOverride = async () => {
+    if (isOverridden || isWaiting || !interactionId) {
       return;
     }
     setIsOverridden(true);
+
+    try {
+      await fetch("/api/ai/guardian/skip-savings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ interactionId }),
+      });
+    } catch {
+      /* best-effort — card reveals regardless */
+    }
+
     onRevealApproved?.();
   };
 

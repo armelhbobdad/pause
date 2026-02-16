@@ -93,28 +93,30 @@ export async function POST(req: Request) {
     );
   }
 
-  // --- Insert savings record and update interaction (atomic) ---
+  // --- Insert savings record and update interaction ---
+  // Sequential queries (neon-http driver does not support transactions)
   try {
     await withTimeout(
-      db.transaction(async (tx) => {
-        await tx.insert(savings).values({
-          id: crypto.randomUUID(),
-          interactionId,
-          amountCents,
-          couponCode: couponCode ?? null,
-          source,
-          applied: true,
-        });
-        await tx
-          .update(interaction)
-          .set({
-            outcome: "accepted",
-            status: "feedback_received",
-          })
-          .where(
-            and(eq(interaction.id, interactionId), isNull(interaction.outcome))
-          );
+      db.insert(savings).values({
+        id: crypto.randomUUID(),
+        interactionId,
+        amountCents,
+        couponCode: couponCode ?? null,
+        source,
+        applied: true,
       }),
+      DB_TIMEOUT_MS
+    );
+    await withTimeout(
+      db
+        .update(interaction)
+        .set({
+          outcome: "accepted",
+          status: "feedback_received",
+        })
+        .where(
+          and(eq(interaction.id, interactionId), isNull(interaction.outcome))
+        ),
       DB_TIMEOUT_MS
     );
   } catch {
