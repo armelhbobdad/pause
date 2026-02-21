@@ -165,7 +165,7 @@ function CommandCenterInner({
   // React Compiler memoizes the transport instance based on cardId stability.
   // If cardId is undefined, body omits it and server returns 400 → onError → break glass.
   const [purchaseInput, setPurchaseInput] = useState("");
-  const { messages, status, sendMessage } = useChat({
+  const { messages, status, sendMessage, setMessages } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/ai/guardian",
       body: cardId ? { cardId } : undefined,
@@ -322,6 +322,12 @@ function CommandCenterInner({
 
   // Handle card click: open dialog and start Guardian flow
   const handleCardActivate = () => {
+    setMessages([]);
+    setPurchaseInput("");
+    autoApprovedRef.current = false;
+    breakGlassRef.current = false;
+    degradedRef.current = false;
+    interactionIdRef.current = null;
     setDialogOpen(true);
     requestUnlock();
   };
