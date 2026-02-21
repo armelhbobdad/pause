@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Eye,
   FileText,
+  Github,
   Microscope,
 } from "lucide-react";
 import Image from "next/image";
@@ -241,8 +242,31 @@ export function AppNavbar() {
         <GuideDropdown />
       </div>
 
-      {/* User menu */}
-      <UserMenu />
+      {/* Utilities */}
+      <div className="flex items-center gap-2">
+        <motion.a
+          aria-label="View source on GitHub"
+          className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+          href="https://github.com/armelhbobdad/pause"
+          rel="noopener"
+          style={{
+            color: "oklch(0.55 0.02 250)",
+            border: "1px solid oklch(1 0 0 / 0.08)",
+          }}
+          target="_blank"
+          whileHover={
+            shouldReduceMotion
+              ? {}
+              : {
+                  color: "oklch(0.85 0.02 250)",
+                  borderColor: "oklch(1 0 0 / 0.15)",
+                }
+          }
+        >
+          <Github className="h-4 w-4" />
+        </motion.a>
+        <UserMenu />
+      </div>
     </nav>
   );
 }
