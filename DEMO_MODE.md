@@ -43,6 +43,7 @@ This activates:
 - **Floating Demo Panel** — interactive pill in the bottom-left corner with profile switching, guided tour
 - **Deterministic AI** — `temperature: 0` and `seed: 42` for reproducible outputs
 - **Mock coupon provider** — returns realistic coupons without a real API
+- **Shorter auto-relock timer** — card auto-locks after **15 seconds** instead of 5 minutes
 - **Seed script safety gate** — allows running `db:seed:rookie` and `db:seed:pro`
 
 ## 2. Seed the Database
@@ -297,9 +298,11 @@ Risk factors include: purchase amount, category, time of day, user history, and 
 
 5. The Analyst tier auto-approves — the card unlocks immediately
 6. A brief explanation of the auto-approval reasoning appears
+7. The card **auto-relocks after 15 seconds** (vs. 5 minutes in production) — watch the countdown timer on the card
 
 **What to observe:**
 - The card transitions from locked to unlocked state
+- A **15-second countdown timer** appears on the unlocked card (shortened for demo)
 - No coupons or reflection prompts — just a quick approval
 - The interaction is recorded in your dashboard history
 
@@ -424,6 +427,7 @@ View traces at [comet.com/opik](https://www.comet.com/opik) under your project.
 | AI Temperature | Model default | `temperature: 0` (deterministic) |
 | AI Seed | None | `seed: 42` (reproducible) |
 | Coupon Provider | Real API (returns empty) | Mock coupons with realistic data |
+| Auto-Relock Timer | 5 minutes (300s) | **15 seconds** (fast demo turnaround) |
 | Demo Panel | Hidden | Floating "DEMO" pill on all pages; interactive (profile switching + guided tour) only on dashboard |
 | Profile Switching | Unavailable | Switch between Rookie/Pro via `POST /api/demo/switch-profile` |
 | Guided Tour | Unavailable | 6-step OnboardJS tour of dashboard features |

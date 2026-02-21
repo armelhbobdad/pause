@@ -47,7 +47,7 @@ export interface CommandCenterProps {
   onCountdownExpire?: () => void;
   /** Callback when Guardian times out */
   onTimeout?: () => void;
-  /** Auto-relock timeout in ms (default: 300000 — 5 minutes for demo) */
+  /** Auto-relock timeout in ms (default: 300000, or 15000 in demo mode) */
   relockTimeoutMs?: number;
   /** Callback when auto-relock fires — used to POST feedback with "timeout" outcome */
   onAutoRelock?: () => void;
@@ -72,6 +72,9 @@ export interface CommandCenterProps {
  * @constraint UX-90: Feed receives `inert` when Guardian is active
  * @constraint NFR-P9: Renders correctly at 1920x1080
  */
+const DEMO_RELOCK_MS = 15_000; // 15 seconds in demo mode
+const DEFAULT_RELOCK_MS = 300_000; // 5 minutes in production
+
 export function CommandCenter({
   card,
   cardId,
@@ -82,7 +85,9 @@ export function CommandCenter({
   countdownDuration = 60_000,
   onCountdownExpire,
   onTimeout,
-  relockTimeoutMs = 300_000,
+  relockTimeoutMs = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
+    ? DEMO_RELOCK_MS
+    : DEFAULT_RELOCK_MS,
   onAutoRelock,
   onReveal,
   className,
@@ -115,7 +120,9 @@ function CommandCenterInner({
   guardianContent,
   feedContent,
   onTimeout,
-  relockTimeoutMs = 300_000,
+  relockTimeoutMs = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
+    ? DEMO_RELOCK_MS
+    : DEFAULT_RELOCK_MS,
   onAutoRelock,
   onReveal,
   className,
