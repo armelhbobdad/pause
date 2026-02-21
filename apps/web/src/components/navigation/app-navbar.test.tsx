@@ -7,6 +7,8 @@ vi.mock("framer-motion", async (importOriginal) => {
     ...actual,
     motion: {
       ...actual.motion,
+      a: "a" as unknown as typeof actual.motion.a,
+      button: "button" as unknown as typeof actual.motion.button,
       div: "div" as unknown as typeof actual.motion.div,
       span: "span" as unknown as typeof actual.motion.span,
     },
