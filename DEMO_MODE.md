@@ -3,11 +3,11 @@
 > Step-by-step instructions for replicating every feature in Pause.
 
 > **IMPORTANT — AI Provider Rate Limits:**
-> Pause uses a **configurable AI provider** (`AI_MODEL` env var) for all AI features (Guardian, Knowledge Chat, ACE Learning). The default deployment uses **Google Gemini 2.5 Flash**, but **Zhipu GLM-4.7-Flash** (free tier) is also supported as an alternative. Each provider has its own rate limits. Each Guardian interaction triggers multiple API calls (risk assessment + streaming response + Skillbook learning), so you can realistically trigger only **~5 full Guardian flows per minute** before hitting quotas.
+> Pause uses a **configurable AI provider** (`AI_MODEL` env var) for all AI features (Guardian, Knowledge Chat, ACE Learning). The default deployment uses **Google Gemini 3 Flash Preview** (10 requests/min, 250 requests/day). **Zhipu GLM-4.7-Flash** (free tier) is also supported as an alternative. Each Guardian interaction triggers multiple API calls (risk assessment + streaming response + Skillbook learning), so you can realistically trigger only **~3 full Guardian flows per minute** before hitting the 10 RPM cap.
 >
-> **If the Guardian shows "Guardian unavailable" with a Manual Unlock fallback**, wait ~45 seconds and try again — the quota resets on a rolling window. The deployed app on Vercel shares the same API key across all users, so concurrent judges will deplete the quota faster.
+> **If the Guardian shows "Guardian unavailable" with a Manual Unlock fallback**, wait ~60 seconds and try again — the quota resets on a rolling window. The deployed app on Vercel shares the same API key across all users, so concurrent judges will deplete the quota faster. With the 250 RPD limit, plan for roughly **~80 full Guardian interactions per day**.
 >
-> **Tip:** Space your Guardian interactions ~15-20 seconds apart for the most reliable experience. The Floating AI Chat and Dashboard features (profile switching, guided tour, history, ghost cards) do **not** count against this limit and work without any rate restrictions.
+> **Tip:** Space your Guardian interactions ~20-30 seconds apart for the most reliable experience. The Floating AI Chat and Dashboard features (profile switching, guided tour, history, ghost cards) do **not** count against this limit and work without any rate restrictions.
 
 ## Table of Contents
 
