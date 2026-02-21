@@ -43,6 +43,7 @@ This activates:
 - **Floating Demo Panel** — interactive pill in the bottom-left corner with profile switching, guided tour
 - **Deterministic AI** — `temperature: 0` and `seed: 42` for reproducible outputs
 - **Mock coupon provider** — returns realistic coupons without a real API
+- **Shorter auto-relock timer** — card auto-locks after **15 seconds** instead of 5 minutes
 - **Seed script safety gate** — allows running `db:seed:rookie` and `db:seed:pro`
 
 ## 2. Seed the Database
@@ -297,9 +298,11 @@ Risk factors include: purchase amount, category, time of day, user history, and 
 
 5. The Analyst tier auto-approves — the card unlocks immediately
 6. A brief explanation of the auto-approval reasoning appears
+7. The card **auto-relocks after 15 seconds** (vs. 5 minutes in production) — watch the countdown timer on the card
 
 **What to observe:**
 - The card transitions from locked to unlocked state
+- A **15-second countdown timer** appears on the unlocked card (shortened for demo)
 - No coupons or reflection prompts — just a quick approval
 - The interaction is recorded in your dashboard history
 
@@ -343,12 +346,12 @@ Risk factors include: purchase amount, category, time of day, user history, and 
 1. Request a card unlock
 2. Type a high-risk purchase like:
 
-> Designer shoes - $250
+> New laptop - $1,200
 
 3. The Therapist tier activates
 4. The AI presents a **reflection prompt** — this could be:
    - Future-self visualization ("How will you feel about this in 30 days?")
-   - Cost reframe ("That's $0.68/day over a year")
+   - Cost reframe ("That's $3.29/day over a year")
    - Need vs. want analysis
    - Other evidence-based techniques
 5. You can respond to the reflection or choose:
@@ -424,6 +427,7 @@ View traces at [comet.com/opik](https://www.comet.com/opik) under your project.
 | AI Temperature | Model default | `temperature: 0` (deterministic) |
 | AI Seed | None | `seed: 42` (reproducible) |
 | Coupon Provider | Real API (returns empty) | Mock coupons with realistic data |
+| Auto-Relock Timer | 5 minutes (300s) | **15 seconds** (fast demo turnaround) |
 | Demo Panel | Hidden | Floating "DEMO" pill on all pages; interactive (profile switching + guided tour) only on dashboard |
 | Profile Switching | Unavailable | Switch between Rookie/Pro via `POST /api/demo/switch-profile` |
 | Guided Tour | Unavailable | 6-step OnboardJS tour of dashboard features |
@@ -455,20 +459,13 @@ Backpack - $55
 
 ### High Risk (Therapist → Reflection)
 ```
-Designer shoes - $250
 New laptop - $1,200
-Luxury watch - $500
-Concert VIP tickets - $300
-```
-
-### Very High Risk (Therapist + Wizard, score 85+)
-```
-Designer handbag - $2,000
 Latest iPhone Pro Max - $1,499
+Designer handbag - $2,000
 Spontaneous vacation booking - $3,500
 ```
 
-> **Note:** Risk scores depend on multiple factors (amount, category, user history, time of day), so the same prompt may route differently for a Rookie vs. Pro user. The Pro user has history that influences scoring.
+> **Note:** Use items **$1,000+** for Therapist tier. The Pro user's interaction history adjusts the risk score (accepted outcomes reduce it, overrides increase it), so lower-priced items like "$250 shoes" may land in Negotiator tier instead. Items at $1,000+ reach the `very_high_price` bracket (75 points) which reliably triggers Therapist even with history adjustments.
 
 ---
 
