@@ -27,12 +27,19 @@ export default function LoginPage() {
       {
         onSuccess: async () => {
           // Always seed Pro profile so dashboard shows rich data
-          await fetch("/api/demo/switch-profile", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ profile: "pro" }),
-          });
-          localStorage.setItem("demo-profile", "pro");
+          try {
+            const res = await fetch("/api/demo/switch-profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ profile: "pro" }),
+            });
+            if (!res.ok) {
+              throw new Error(`Seed failed: ${res.status}`);
+            }
+            localStorage.setItem("demo-profile", "pro");
+          } catch {
+            // Seed failed — still navigate, dashboard will show whatever data exists
+          }
           router.push("/dashboard");
         },
         onError: (error) => {
