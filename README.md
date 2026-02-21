@@ -17,17 +17,27 @@ The average person makes **multiple impulse purchases every week** — and most 
 
 > Built for the **Encode Club Hackathon** — Financial Health & Best Use of Opik categories.
 
-<!-- TODO: Replace with actual URLs once deployed -->
-<!-- **[Live Demo](https://pause.vercel.app)** | **[Demo Video (3 min)](https://youtu.be/...)** 
+**Deep dives:** [Guardian AI](https://medium.com/@armelhbobdad/deep-dive-how-pause-turns-impulse-spending-into-smarter-decisions-f07b22442970) | [ACE Skillbooks](https://dev.to/armelhbobdad/deep-dive-self-improving-ai-with-ace-skillbooks-2300) | [Opik Observability](https://dev.to/armelhbobdad/deep-dive-building-observable-ai-with-opik-2424)
 
-<p align="center">
-  <img src="apps/web/public/og-image.png" alt="Pause — AI Financial Guardian" width="600" />
-</p>-->
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Features](#features)
+- [How It Works](#how-it-works)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Environment Variables](#environment-variables)
+- [Project Structure](#project-structure)
+- [Scripts](#scripts)
+- [Deep Dive Articles](#deep-dive-articles)
+- [Acknowledgements](#acknowledgements)
+- [License](#license)
 
 ## Architecture
 
 ```mermaid
-graph TB
+flowchart TB
     subgraph "apps/"
         WEB[web — Next.js 16 App]
     end
@@ -70,7 +80,6 @@ graph TB
 - **Auto-approve** — Low-risk purchases pass through instantly with no friction
 - **Coupon Search** — Negotiator tier finds real savings and applies them before you unlock your card
 - **Reflection Prompts** — Therapist tier guides you through evidence-based spending reflection techniques
-
 - **Floating Chat** — Always-accessible AI assistant that answers questions about your spending and Pause features, with smart availability based on Guardian state
 
 ### Learning & Feedback
@@ -86,7 +95,7 @@ graph TB
 
 ## How It Works
 
-```
+```text
 1. You tap your card to make a purchase
          ↓
 2. Pause intercepts and assesses risk (low / medium / high)
@@ -167,7 +176,7 @@ The app runs at `http://localhost:3001`.
 
 ## Project Structure
 
-```
+```text
 pause/
 ├── apps/
 │   └── web/                 # Next.js 16 application
@@ -194,6 +203,14 @@ bun run db:studio    # Open Drizzle Studio
 bun test             # Run test suite
 ```
 
+## Deep Dive Articles
+
+Technical deep dives exploring Pause's core systems:
+
+- [**How Pause Turns Impulse Spending Into Smarter Decisions**](https://medium.com/@armelhbobdad/deep-dive-how-pause-turns-impulse-spending-into-smarter-decisions-f07b22442970) — Guardian state machine, tiered AI strategies, and the psychology behind the pause
+- [**Self-Improving AI with ACE Skillbooks**](https://dev.to/armelhbobdad/deep-dive-self-improving-ai-with-ace-skillbooks-2300) — How the ACE framework lets the Guardian learn and adapt its strategies over time
+- [**Building Observable AI with Opik**](https://dev.to/armelhbobdad/deep-dive-building-observable-ai-with-opik-2424) — End-to-end tracing and observability for AI interactions using Opik + Vercel AI SDK
+
 ## Acknowledgements
 
 - [**Encode Club**](https://www.encodeclub.com/programmes/comet-resolution-v2-hackathon) — For launching and organizing this hackathon
@@ -201,7 +218,7 @@ bun test             # Run test suite
 - [**Neon**](https://neon.com/) — For free-tier PostgreSQL credits
 - [**Vercel**](https://vercel.com/) — For free-tier hosting
 - [**Zhipu AI**](https://z.ai/) — For free-tier GLM-4.7-Flash API access
-- [**Google DeepMind**](https://deepmind.google/) — For free-tier Gemini 2.5 Flash credits
+- [**Google DeepMind**](https://deepmind.google/) — For free-tier Gemini 3 Flash Preview credits
 - [**Opik**](https://www.comet.com/site/products/opik/) — For free-tier observability platform credits
 - [**Kayba AI**](https://kayba.ai/) — For the [TypeScript port of the ACE framework](https://github.com/kayba-ai/ace-ts)
 
