@@ -3,7 +3,7 @@
 > Step-by-step instructions for replicating every feature in Pause.
 
 > **IMPORTANT — AI Provider Rate Limits:**
-> Pause uses a **configurable AI provider** (`AI_MODEL` env var) for all AI features (Guardian, Knowledge Chat, ACE Learning). The default deployment uses **Zhipu GLM-4.7-Flash** (free tier), but **Google Gemini 2.5 Flash** is also supported. Each provider has its own rate limits. Each Guardian interaction triggers multiple API calls (risk assessment + streaming response + Skillbook learning), so you can realistically trigger only **~5 full Guardian flows per minute** before hitting quotas.
+> Pause uses a **configurable AI provider** (`AI_MODEL` env var) for all AI features (Guardian, Knowledge Chat, ACE Learning). The default deployment uses **Google Gemini 2.5 Flash**, but **Zhipu GLM-4.7-Flash** (free tier) is also supported as an alternative. Each provider has its own rate limits. Each Guardian interaction triggers multiple API calls (risk assessment + streaming response + Skillbook learning), so you can realistically trigger only **~5 full Guardian flows per minute** before hitting quotas.
 >
 > **If the Guardian shows "Guardian unavailable" with a Manual Unlock fallback**, wait ~45 seconds and try again — the quota resets on a rolling window. The deployed app on Vercel shares the same API key across all users, so concurrent judges will deplete the quota faster.
 >
