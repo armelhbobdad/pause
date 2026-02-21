@@ -25,8 +25,10 @@ function getZhipu() {
 /**
  * Returns the configured AI language model based on the AI_MODEL env var.
  *
- * Format: "provider:model" (e.g., "google:gemini-2.5-flash", "zhipu:glm-4.7")
- * Default: "google:gemini-2.5-flash"
+ * Format: "provider:model" (e.g., "google:gemini-3-flash-preview", "zhipu:glm-4.7")
+ * Default: "google:gemini-3-flash-preview"
+ *
+ * Rate limits (Gemini 3 Flash Preview): 10 RPM, 250 RPD.
  *
  * Provider-specific configuration is handled internally:
  * - Zhipu: Deep thinking mode is disabled to reduce latency.

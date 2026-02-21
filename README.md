@@ -156,7 +156,7 @@ The app runs at `http://localhost:3001`.
 | `DATABASE_URL_LOCAL` | No | Local proxy URL (overrides DATABASE_URL in dev) |
 | `BETTER_AUTH_SECRET` | Yes | Session encryption secret (32+ characters) |
 | `BETTER_AUTH_URL` | Yes | Base URL (`http://localhost:3001` in dev) |
-| `AI_MODEL` | No | Model selection in `provider:model` format (default: `zhipu:glm-4.7-Flash`) |
+| `AI_MODEL` | No | Model selection in `provider:model` format (default: `google:gemini-3-flash-preview`) |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | When using Google | Google AI API key for Gemini |
 | `ZHIPU_API_KEY` | When using Zhipu | Z.AI API key for GLM-4.7-Flash |
 | `OPIK_API_KEY` | Production only | Opik tracing API key |
